@@ -5,7 +5,12 @@ import utilStyles from '../styles/utils.module.css'
 export default function Home() {
   return (
     <Layout home>
-      <h1>Hello World!</h1>
+      <Head>
+        <title>{siteTitle}</title>
+      </Head>
+      <section className={utilStyles.headingMd}>
+        <p>Hello, I’m <strong>Elena</strong>. I’m a software engineer. You can contact me on <a href="https://twitter.com/elenatanasoiu">Twitter</a>.</p>
+      </section>
     </Layout>
   )
 }
