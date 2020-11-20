@@ -1,12 +1,17 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import styles from './layout.module.scss';
 import utilStyles from '../styles/utils.module.scss';
-import Link from 'next/link';
 
 const name = 'Elena Tănăsoiu';
 export const siteTitle = 'Elena Tănăsoiu';
 
-export default function Layout({ children, home }) {
+type LayoutProps = {
+  children: React.ReactNode;
+  home: boolean;
+};
+
+export default function Layout({ children, home }: LayoutProps) {
   return (
     <div className={styles.container}>
       <Head>
