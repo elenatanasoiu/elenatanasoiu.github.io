@@ -1,20 +1,17 @@
-import Head from 'next/head'
-import styles from './layout.module.scss'
-import utilStyles from '../styles/utils.module.scss'
-import Link from 'next/link'
+import Head from 'next/head';
+import styles from './layout.module.scss';
+import utilStyles from '../styles/utils.module.scss';
+import Link from 'next/link';
 
-const name = 'Elena Tănăsoiu'
-export const siteTitle = 'Elena Tănăsoiu'
+const name = 'Elena Tănăsoiu';
+export const siteTitle = 'Elena Tănăsoiu';
 
 export default function Layout({ children, home }) {
   return (
     <div className={styles.container}>
       <Head>
         <link rel="icon" href="/favicon.ico" />
-        <meta
-          name="description"
-          content="Elena Tanasoiu"
-        />
+        <meta name="description" content="Elena Tanasoiu" />
         <meta name="og:title" content={siteTitle} />
         <meta name="twitter:card" content="summary_large_image" />
       </Head>
@@ -56,5 +53,5 @@ export default function Layout({ children, home }) {
         </div>
       )}
     </div>
-  )
+  );
 }
