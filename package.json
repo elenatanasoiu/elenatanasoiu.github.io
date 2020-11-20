@@ -15,6 +15,7 @@
     "postcss-preset-env": "^6.7.0",
     "react": "16.13.1",
     "react-dom": "16.13.1",
+    "sass": "^1.29.0",
     "tailwindcss": "^2.0.1"
   },
   "devDependencies": {
