@@ -1,5 +1,4 @@
 import { GetStaticProps, GetStaticPaths } from 'next';
-import Head from 'next/head';
 import Layout from '../../components/layout';
 import Date from '../../components/date';
 import { getAllPostIds, getPostData } from '../../lib/posts';
@@ -13,14 +12,18 @@ export default function Post({
     title: string;
     date: string;
     content: string;
+    cardImagePath: string;
+    shortDescription: string;
   };
 }) {
   return (
-    <Layout>
-      <Head>
-        <title>{postData.title}</title>
-      </Head>
+    <Layout
+      pageTitle={postData.title}
+      shortDescription={postData.shortDescription}
+      cardImagePath={postData.cardImagePath}
+    >
       <article>
+        <img src={`/images/${postData.cardImagePath}`} alt="sapling" />
         <h1 className={utilStyles.headingXl}>{postData.title}</h1>
         <div className={utilStyles.lightText}>
           <Date dateString={postData.date} />

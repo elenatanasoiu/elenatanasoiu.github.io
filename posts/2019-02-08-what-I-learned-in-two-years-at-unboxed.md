@@ -1,6 +1,9 @@
 ---
 title: 'What I learned in two years at Unboxed'
 date: '2019-02-08'
+cardImagePath: '2019-02-08-sapling.jpeg'
+shortDescription: 'Notes on lessons learned about “what good looks like” as a 
+software developer at Unboxed.'
 ---
 
 When I joined Unboxed in 2016 I had recently moved to the UK and was looking for

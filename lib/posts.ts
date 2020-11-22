@@ -19,7 +19,12 @@ const allPosts = postFiles.map((file) => {
 
   return {
     id,
-    ...(result.data as { date: string; title: string })
+    ...(result.data as {
+      date: string;
+      title: string;
+      cardImagePath: string;
+      shortDescription: string;
+    })
   };
 });
 
@@ -49,6 +54,11 @@ export async function getPostData(id: string) {
   return {
     id,
     content,
-    ...(result.data as { date: string; title: string })
+    ...(result.data as {
+      date: string;
+      title: string;
+      cardImagePath: string;
+      shortDescription: string;
+    })
   };
 }
