@@ -4,6 +4,7 @@ import Layout from '../components/layout';
 import utilStyles from '../styles/utils.module.scss';
 import postsByDate from '../lib/posts';
 import Date from '../components/date';
+import SocialList from '../components/SocialList';
 
 export default function Home({
   posts
@@ -19,9 +20,7 @@ export default function Home({
       <section className={utilStyles.headingMd}>
         <p>
           Hello, I’m <strong>Elena</strong>. I’m a software engineer. You can find me on{' '}
-          <a href="https://github.com/elenatanasoiu">Github</a>,{' '}
-          <a href="https://twitter.com/elenatanasoiu">Twitter</a>, and{' '}
-          <a href="https://linkedin.com/in/elenatanasoiu">LinkedIn</a>.
+          <SocialList />
         </p>
       </section>
       <section className={`${utilStyles.headingMd} ${utilStyles.padding1px}`}>
