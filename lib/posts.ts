@@ -5,15 +5,15 @@ import matter from 'gray-matter';
 const postsDirectory = path.join(process.cwd(), 'posts');
 const postFiles = fs.readdirSync(postsDirectory);
 
-const parseMarkdown = (fileName: string) => {
-  const fullPath = path.join(postsDirectory, fileName);
+const parseMarkdown = (id: string) => {
+  const fullPath = path.join(postsDirectory, `${id}.md`);
   const fileContents = fs.readFileSync(fullPath, 'utf8');
   return matter(fileContents);
 };
 
 const allPosts = postFiles.map((file) => {
   const id = file.replace(/\.md$/, '');
-  const result = parseMarkdown(file);
+  const result = parseMarkdown(id);
 
   return {
     id,
@@ -37,3 +37,12 @@ export const getAllPostIds = postFiles.map((file) => {
     }
   };
 });
+
+export function getPostData(id: string) {
+  const result = parseMarkdown(id);
+
+  return {
+    id,
+    ...(result.data as { date: string; title: string })
+  };
+}
