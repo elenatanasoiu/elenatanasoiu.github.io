@@ -8,7 +8,7 @@ export const siteTitle = 'Elena Tănăsoiu';
 
 type LayoutProps = {
   children: React.ReactNode;
-  home: boolean;
+  home?: boolean;
 };
 
 export default function Layout({ children, home }: LayoutProps) {
