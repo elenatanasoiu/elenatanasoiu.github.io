@@ -29,3 +29,11 @@ export default function postsByDate() {
     return -1;
   });
 }
+
+export const getAllPostIds = postFiles.map((file) => {
+  return {
+    params: {
+      id: file.replace(/\.md$/, '')
+    }
+  };
+});
