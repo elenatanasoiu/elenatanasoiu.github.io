@@ -10,7 +10,28 @@ class MyDocument extends Document {
   render() {
     return (
       <Html lang="en">
-        <Head />
+        <Head>
+          {process.env.HOSTNAME === 'localhost' ? (
+            ''
+          ) : (
+            <>
+              <script async src="https://www.googletagmanager.com/gtag/js?id=G-7XFFYZEJ8V" />
+              <script
+                async
+                dangerouslySetInnerHTML={{
+                  __html: `window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+                  gtag('config', 'G-7XFFYZEJ8V');`
+                }}
+              />
+            </>
+          )}
+          <meta
+            name="google-site-verification"
+            content="cg7jAFWfVCMMoxw-zNJGgiAPBXETsQfHfFLiY7axkF0"
+          />
+        </Head>
         <body>
           <Main />
           <NextScript />
