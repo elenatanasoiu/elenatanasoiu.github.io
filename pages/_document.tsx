@@ -31,6 +31,10 @@ class MyDocument extends Document {
             name="google-site-verification"
             content="cg7jAFWfVCMMoxw-zNJGgiAPBXETsQfHfFLiY7axkF0"
           />
+          <meta
+            name="google-site-verification"
+            content="cg7jAFWfVCMMoxw-zNJGgiAPBXETsQfHfFLiY7axkF0"
+          />
         </Head>
         <body>
           <Main />
