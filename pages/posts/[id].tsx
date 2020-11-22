@@ -1,6 +1,8 @@
 import { GetStaticProps, GetStaticPaths } from 'next';
 import Layout from '../../components/layout';
+import Date from '../../components/date';
 import { getAllPostIds, getPostData } from '../../lib/posts';
+import utilStyles from '../../styles/utils.module.scss';
 
 export default function Post({
   postData
@@ -18,7 +20,9 @@ export default function Post({
       <br />
       {postData.id}
       <br />
-      {postData.date}
+      <div className={utilStyles.lightText}>
+        <Date dateString={postData.date} />
+      </div>
       <br />
       <div dangerouslySetInnerHTML={{ __html: postData.content }} />
     </Layout>
