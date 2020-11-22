@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
+import remark from 'remark';
+import html from 'remark-html';
 
 const postsDirectory = path.join(process.cwd(), 'posts');
 const postFiles = fs.readdirSync(postsDirectory);
@@ -38,11 +40,15 @@ export const getAllPostIds = postFiles.map((file) => {
   };
 });
 
-export function getPostData(id: string) {
+export async function getPostData(id: string) {
   const result = parseMarkdown(id);
+
+  const htmlContent = await remark().use(html).process(result.content);
+  const content = htmlContent.toString();
 
   return {
     id,
+    content,
     ...(result.data as { date: string; title: string })
   };
 }
