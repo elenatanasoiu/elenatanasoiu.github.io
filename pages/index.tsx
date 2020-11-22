@@ -1,8 +1,10 @@
 import Head from 'next/head';
 import { GetStaticProps } from 'next';
+import Link from 'next/link';
 import Layout, { siteTitle } from '../components/layout';
 import utilStyles from '../styles/utils.module.scss';
 import postsByDate from '../lib/posts';
+import Date from '../components/date';
 
 export default function Home({
   posts
@@ -29,11 +31,11 @@ export default function Home({
         <ul className={utilStyles.list}>
           {posts.map(({ id, date, title }) => (
             <li className={utilStyles.listItem} key={id}>
-              {title}
+              <Link href={`/posts/${id}`}>{title}</Link>
               <br />
-              {id}
-              <br />
-              {date}
+              <small className={utilStyles.lightText}>
+                <Date dateString={date} />
+              </small>
             </li>
           ))}
         </ul>
