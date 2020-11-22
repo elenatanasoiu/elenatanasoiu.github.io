@@ -6,7 +6,7 @@
     "dev": "next",
     "build": "next build",
     "start": "next start",
-    "deploy": "next build && next-sitemap && next export -o docs && git checkout -- docs/CNAME && git checkout -- docs/.nojekyll && git checkout -- public/sitemap.xml && git add docs && git commit -m \"Regenerate static site\" && git push origin master"
+    "deploy": "next build && next-sitemap && next export -o docs && git checkout -- docs/CNAME && git checkout -- docs/.nojekyll && git checkout -- public/sitemap.xml && git add docs && git commit -m \"Regenerate static site\" && git push origin master -f"
   },
   "dependencies": {
     "date-fns": "^2.16.1",
