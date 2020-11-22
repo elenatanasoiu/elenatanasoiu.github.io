@@ -98,6 +98,11 @@
     lodash "^4.17.13"
     to-fast-properties "^2.0.0"
 
+"@corex/deepmerge@^2.4.24":
+  version "2.4.24"
+  resolved "https://registry.yarnpkg.com/@corex/deepmerge/-/deepmerge-2.4.24.tgz#d02aa2bf1a5c7f3847d4227d6700419450909f63"
+  integrity sha512-TBYXnhxYU9kqDhUXm/rgDRRAxHVpX8Y3ZX+zmTmQuhRF9p7orsrx+P/lVXS7PcPnOFFVE3ZvyE5MIYFipecy8g==
+
 "@csstools/convert-colors@^1.4.0":
   version "1.4.0"
   resolved "https://registry.yarnpkg.com/@csstools/convert-colors/-/convert-colors-1.4.0.tgz#ad495dc41b12e75d588c6db8b9834f08fa131eb7"
@@ -3737,6 +3742,14 @@ neo-async@^2.5.0, neo-async@^2.6.1, neo-async@^2.6.2:
   version "2.6.2"
   resolved "https://registry.yarnpkg.com/neo-async/-/neo-async-2.6.2.tgz#b4aafb93e3aeb2d8174ca53cf163ab7d7308305f"
   integrity sha512-Yd3UES5mWCSqR+qNT93S3UoYUkqAZ9lLg8a7g9rimsWmYGK8cVToA4/sF3RrshdyV3sAGMXVUmpMYOw+dLpOuw==
+
+next-sitemap@^1.3.2:
+  version "1.3.2"
+  resolved "https://registry.yarnpkg.com/next-sitemap/-/next-sitemap-1.3.2.tgz#f88ddb1cca8a7d3cdcafc18ec1c3d71358670e57"
+  integrity sha512-wOVIRxVaSAtcr35K0Mi6rtfTwY0nw2UWpcbAUORscGIeU/O/V22Qq1dkodf1h2ftc/MMTrDYYkiMBhkiWh0O/w==
+  dependencies:
+    "@corex/deepmerge" "^2.4.24"
+    minimist "^1.2.5"
 
 next-tick@~1.0.0:
   version "1.0.0"
