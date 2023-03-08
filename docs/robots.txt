@@ -1,4 +1,9 @@
+# *
 User-agent: *
 Allow: /
+
+# Host
 Host: https://elenatanasoiu.com
+
+# Sitemaps
 Sitemap: https://elenatanasoiu.com/sitemap.xml
