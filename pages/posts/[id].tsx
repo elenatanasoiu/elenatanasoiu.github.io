@@ -23,7 +23,7 @@ export default function Post({
       cardImagePath={postData.cardImagePath}
     >
       <article>
-        <img src={`/images/${postData.cardImagePath}`} alt="sapling" />
+        {postData.cardImagePath && <img src={`/images/${postData.cardImagePath}`} alt={postData.cardImagePath} /> }
         <h1 className={utilStyles.headingXl}>{postData.title}</h1>
         <div className={utilStyles.lightText}>
           <Date dateString={postData.date} />
