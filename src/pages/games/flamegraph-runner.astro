@@ -1,0 +1,762 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Nav from "../../components/Nav.astro";
+import Footer from "../../components/Footer.astro";
+---
+
+<Layout ogImage="/images/og-flamegraph-runner.png" title="" ogImage="/images/og-flamegraph-runner.png" description="A black cat runs across flamegraphs collecting performance wins.">
+  <Nav />
+
+  <main class="flex-1 pt-24 pb-8">
+    <div class="max-w-4xl mx-auto px-6 text-center">
+      <h1 class="text-2xl font-bold mb-2">🐈‍⬛ Flamegraph Runner</h1>
+      <p class="text-text-muted text-sm mb-4 font-mono">Jump over hot bars. Collect CPU savings. Don't get burned.</p>
+
+      <div class="relative inline-block">
+        <canvas
+          id="game"
+          width="800"
+          height="400"
+          class="rounded-xl border border-surface-600 bg-surface-900 max-w-full"
+          style="image-rendering: pixelated;"
+        ></canvas>
+
+        <div id="start-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-900/80 rounded-xl">
+          <p class="text-3xl mb-2">🐈‍⬛</p>
+          <p class="text-flame-400 font-mono text-lg mb-4">Flamegraph Runner</p>
+          <button id="start-btn" class="bg-flame-500 hover:bg-flame-600 text-white px-6 py-2 rounded-lg font-mono text-sm cursor-pointer transition-colors">
+            Start Game
+          </button>
+          <p class="text-text-muted text-xs mt-3 font-mono">Space / Tap to jump · ↑↓ / Swipe to switch lanes</p>
+        </div>
+
+        <div id="game-over" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-900/80 rounded-xl hidden">
+          <p class="text-flame-400 font-mono text-lg mb-2">Game Over!</p>
+          <p id="final-score" class="text-text-primary font-mono text-2xl mb-1"></p>
+          <p id="final-msg" class="text-text-muted text-sm font-mono mb-4"></p>
+          <button id="restart-btn" class="bg-flame-500 hover:bg-flame-600 text-white px-6 py-2 rounded-lg font-mono text-sm cursor-pointer transition-colors">
+            Play Again
+          </button>
+        </div>
+      </div>
+
+      <div class="flex justify-center gap-8 mt-4 text-sm font-mono">
+        <div>
+          <span class="text-text-muted">Score: </span>
+          <span id="score-display" class="text-flame-400">0</span>
+        </div>
+        <div>
+          <span class="text-text-muted">Best: </span>
+          <span id="best-display" class="text-flame-400">0</span>
+        </div>
+      </div>
+
+      <div class="mt-6">
+        <a href="/games" class="text-text-muted hover:text-flame-400 text-sm font-mono">← back to games</a>
+      </div>
+    </div>
+  </main>
+
+  <Footer />
+</Layout>
+
+<script>
+  const canvas = document.getElementById("game") as HTMLCanvasElement;
+  const ctx = canvas.getContext("2d")!;
+  const startScreen = document.getElementById("start-screen")!;
+  const gameOverScreen = document.getElementById("game-over")!;
+  const startBtn = document.getElementById("start-btn")!;
+  const restartBtn = document.getElementById("restart-btn")!;
+  const scoreDisplay = document.getElementById("score-display")!;
+  const bestDisplay = document.getElementById("best-display")!;
+  const finalScore = document.getElementById("final-score")!;
+  const finalMsg = document.getElementById("final-msg")!;
+
+  // Colors
+  const COLORS = {
+    bg: "#050508",
+    ground: "#0a0a12",
+    flameBars: ["#c2410c", "#ea580c", "#f97316", "#fb923c", "#fdba74", "#fbbf24"],
+    coolBars: ["#0d9488", "#14b8a6", "#2dd4bf"],
+    cat: "#111111",
+    catEye: "#fb923c",
+    collectible: "#00ffcc",
+    text: "#f0f0f5",
+    textMuted: "#6b6b7b",
+  };
+
+  // Game state
+  let running = false;
+  let score = 0;
+  let best = parseInt(localStorage.getItem("flamegraph-runner-best") || "0");
+  let speed = 3;
+  let frameCount = 0;
+
+  bestDisplay.textContent = best.toString();
+
+  // Web Audio
+  let audioCtx: AudioContext | null = null;
+  function ensureAudio() {
+    if (!audioCtx) audioCtx = new AudioContext();
+    return audioCtx;
+  }
+  function playTone(startHz: number, endHz: number, duration: number, gain = 0.06) {
+    try {
+      const a = ensureAudio();
+      const osc = a.createOscillator();
+      const g = a.createGain();
+      osc.frequency.setValueAtTime(startHz, a.currentTime);
+      osc.frequency.linearRampToValueAtTime(endHz, a.currentTime + duration);
+      g.gain.setValueAtTime(gain, a.currentTime);
+      g.gain.linearRampToValueAtTime(0, a.currentTime + duration);
+      osc.connect(g).connect(a.destination);
+      osc.start();
+      osc.stop(a.currentTime + duration);
+    } catch {}
+  }
+  const sfx = {
+    jump: () => playTone(200, 400, 0.1),
+    collect: () => playTone(800, 800, 0.15),
+    hit: () => playTone(100, 100, 0.2),
+    laneSwitch: () => playTone(300, 500, 0.08, 0.04),
+  };
+
+  // Cat
+  const cat = {
+    x: 100,
+    y: 0,
+    w: 30,
+    h: 20,
+    vy: 0,
+    grounded: true,
+    jumpForce: -10.5,
+    gravity: 0.4,
+    groundY: 0,
+    legPhase: 0,
+    jumpsRemaining: 2,
+  };
+
+  // Flamegraph bars (the ground)
+  interface Bar {
+    x: number;
+    w: number;
+    h: number;
+    color: string;
+    type: "flame" | "cool";
+  }
+
+  let bars: Bar[] = [];
+  let nextBarX = 0;
+
+  // Obstacles (tall hot bars to jump over)
+  interface Obstacle {
+    x: number;
+    w: number;
+    h: number;
+    color: string;
+    lane: 0 | 1;
+  }
+
+  let obstacles: Obstacle[] = [];
+
+  // Collectibles (CPU % savings floating above)
+  interface Collectible {
+    x: number;
+    y: number;
+    value: number;
+    label: string;
+    collected: boolean;
+    bobPhase: number;
+    lane: 0 | 1;
+  }
+
+  let collectibles: Collectible[] = [];
+
+  // Floating score popups
+  interface Popup {
+    x: number;
+    y: number;
+    text: string;
+    life: number;
+    color?: string;
+  }
+
+  let popups: Popup[] = [];
+
+  // Star burst particles (on collectible pickup)
+  interface StarParticle {
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    size: number;
+    life: number;
+    color: string;
+  }
+
+  let starParticles: StarParticle[] = [];
+
+  function drawStarShape(cx: number, cy: number, outerR: number, innerR: number, points: number) {
+    ctx.beginPath();
+    for (let i = 0; i < points * 2; i++) {
+      const r = i % 2 === 0 ? outerR : innerR;
+      const angle = (Math.PI * i) / points - Math.PI / 2;
+      const x = cx + Math.cos(angle) * r;
+      const y = cy + Math.sin(angle) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  }
+
+  const GROUND_Y = 300;
+  const BAR_BASE = 320;
+  const LANE_OFFSET = 60;
+  const BOTTOM_GROUND = GROUND_Y;
+  const TOP_GROUND = GROUND_Y - LANE_OFFSET;
+
+  let currentLane: 0 | 1 = 0;
+  let laneGroundY = GROUND_Y;
+  let targetLaneGroundY = GROUND_Y;
+  let touchStartY = 0;
+
+  function getLaneGround(lane: 0 | 1): number {
+    return lane === 0 ? BOTTOM_GROUND : TOP_GROUND;
+  }
+
+  function switchLane(lane: 0 | 1) {
+    if (lane === currentLane) return;
+    currentLane = lane;
+    targetLaneGroundY = getLaneGround(lane);
+    sfx.laneSwitch();
+  }
+
+  function generateBars() {
+    while (nextBarX < canvas.width + 200) {
+      const w = 20 + Math.random() * 60;
+      const h = 40 + Math.random() * 120;
+      const isFlame = Math.random() > 0.25;
+      const colorSet = isFlame ? COLORS.flameBars : COLORS.coolBars;
+      const color = colorSet[Math.floor(Math.random() * colorSet.length)];
+
+      bars.push({
+        x: nextBarX,
+        w,
+        h,
+        color,
+        type: isFlame ? "flame" : "cool",
+      });
+
+      nextBarX += w;
+    }
+  }
+
+  function spawnObstacle() {
+    const lane: 0 | 1 = Math.random() < 0.5 ? 0 : 1;
+    const w = 15 + Math.random() * 20;
+    const baseH = lane === 1 ? 28 + Math.random() * 30 : 20 + Math.random() * 25;
+    obstacles.push({
+      x: canvas.width + 50,
+      w,
+      h: baseH,
+      color: COLORS.flameBars[Math.floor(Math.random() * 3)],
+      lane,
+    });
+  }
+
+  function spawnCollectible() {
+    const lane: 0 | 1 = Math.random() < 0.5 ? 0 : 1;
+    const values = [1, 2, 3, 5, 10, 13, 23];
+    let value = values[Math.floor(Math.random() * values.length)];
+    if (lane === 1) value *= 2;
+    const ground = getLaneGround(lane);
+    collectibles.push({
+      x: canvas.width + 50 + Math.random() * 200,
+      y: ground - 50 - Math.random() * 80,
+      value,
+      label: `-${value}% CPU`,
+      collected: false,
+      bobPhase: Math.random() * Math.PI * 2,
+      lane,
+    });
+  }
+
+  function drawCat() {
+    const floorY = laneGroundY - cat.h;
+    const drawY = cat.grounded ? floorY : cat.y;
+    cat.legPhase += 0.3;
+
+    // Body
+    ctx.fillStyle = COLORS.cat;
+    ctx.beginPath();
+    ctx.ellipse(cat.x + 15, drawY + 10, 14, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Head
+    ctx.beginPath();
+    ctx.ellipse(cat.x + 27, drawY + 3, 7, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ears
+    ctx.beginPath();
+    ctx.moveTo(cat.x + 22, drawY - 2);
+    ctx.lineTo(cat.x + 24, drawY - 9);
+    ctx.lineTo(cat.x + 27, drawY - 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(cat.x + 28, drawY - 2);
+    ctx.lineTo(cat.x + 30, drawY - 9);
+    ctx.lineTo(cat.x + 33, drawY - 2);
+    ctx.fill();
+
+    // Eyes
+    ctx.fillStyle = COLORS.catEye;
+    ctx.beginPath();
+    ctx.arc(cat.x + 29, drawY + 2, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cat.x + 33, drawY + 2, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tail
+    ctx.strokeStyle = COLORS.cat;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    const tailWag = Math.sin(cat.legPhase * 0.8) * 5;
+    ctx.moveTo(cat.x + 2, drawY + 8);
+    ctx.quadraticCurveTo(cat.x - 8, drawY - 5 + tailWag, cat.x - 5, drawY - 12 + tailWag);
+    ctx.stroke();
+
+    // Legs
+    ctx.fillStyle = COLORS.cat;
+    if (cat.grounded) {
+      const legOffset1 = Math.sin(cat.legPhase) * 3;
+      const legOffset2 = Math.sin(cat.legPhase + Math.PI) * 3;
+
+      // Front legs
+      ctx.fillRect(cat.x + 22 + legOffset1, drawY + 14, 2.5, 6);
+      ctx.fillRect(cat.x + 27 + legOffset2, drawY + 14, 2.5, 6);
+      // Back legs
+      ctx.fillRect(cat.x + 6 + legOffset2, drawY + 14, 2.5, 6);
+      ctx.fillRect(cat.x + 11 + legOffset1, drawY + 14, 2.5, 6);
+    } else {
+      // Tucked legs while jumping
+      ctx.fillRect(cat.x + 10, drawY + 15, 2.5, 3);
+      ctx.fillRect(cat.x + 15, drawY + 15, 2.5, 3);
+      ctx.fillRect(cat.x + 22, drawY + 15, 2.5, 3);
+      ctx.fillRect(cat.x + 27, drawY + 15, 2.5, 3);
+    }
+  }
+
+  function drawFlameBars() {
+    for (const bar of bars) {
+      ctx.fillStyle = bar.color;
+      ctx.globalAlpha = 0.6;
+      ctx.fillRect(bar.x, BAR_BASE - bar.h, bar.w, bar.h + 80);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawObstacles() {
+    for (const obs of obstacles) {
+      const obsGround = getLaneGround(obs.lane);
+      ctx.globalAlpha = obs.lane === currentLane ? 1 : 0.35;
+      // Draw as a glowing hot bar
+      ctx.fillStyle = obs.color;
+      ctx.shadowColor = obs.color;
+      ctx.shadowBlur = obs.lane === currentLane ? 8 : 2;
+      ctx.fillRect(obs.x, obsGround - obs.h, obs.w, obs.h);
+      ctx.shadowBlur = 0;
+
+      // Warning icon
+      ctx.fillStyle = "#fef3c7";
+      ctx.font = "10px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("🔥", obs.x + obs.w / 2, obsGround - obs.h - 5);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawCollectibles() {
+    for (const c of collectibles) {
+      if (c.collected) continue;
+      const bobY = c.y + Math.sin(c.bobPhase) * 6;
+      const active = c.lane === currentLane;
+      const pulseGlow = 8 + Math.sin(c.bobPhase * 2.5) * 6;
+
+      ctx.save();
+      ctx.globalAlpha = active ? 1 : 0.35;
+
+      // Star glow
+      const starColor = c.lane === 1 ? "#ffcc00" : "#fbbf24";
+      ctx.shadowColor = starColor;
+      ctx.shadowBlur = active ? pulseGlow + 8 : 4;
+
+      // Outer star
+      ctx.fillStyle = starColor;
+      drawStarShape(c.x, bobY, 14, 6, 5);
+      ctx.fill();
+
+      // Inner highlight
+      ctx.fillStyle = "#fff8e1";
+      drawStarShape(c.x, bobY, 7, 3, 5);
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+
+      // Label below star
+      ctx.fillStyle = active ? "#fff" : "#ccc";
+      ctx.font = "bold 13px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(c.label, c.x, bobY + 24);
+
+      ctx.restore();
+    }
+
+    // Draw star burst particles
+    for (const p of starParticles) {
+      ctx.save();
+      ctx.globalAlpha = p.life / 30;
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 4;
+      drawStarShape(p.x, p.y, p.size, p.size * 0.4, 5);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawGround() {
+    // Bottom ground fill
+    ctx.fillStyle = "#1a1a25";
+    ctx.fillRect(0, BOTTOM_GROUND, canvas.width, 100);
+
+    // Top lane platform strip
+    ctx.fillStyle = currentLane === 1 ? "#1a1a2a" : "#121220";
+    ctx.fillRect(0, TOP_GROUND - 2, canvas.width, 4);
+
+    // Bottom lane line
+    ctx.strokeStyle = currentLane === 0 ? "#fb923c80" : "#fb923c20";
+    ctx.lineWidth = currentLane === 0 ? 2 : 1;
+    ctx.beginPath();
+    ctx.moveTo(0, BOTTOM_GROUND);
+    ctx.lineTo(canvas.width, BOTTOM_GROUND);
+    ctx.stroke();
+
+    // Top lane line
+    ctx.strokeStyle = currentLane === 1 ? "#fb923c80" : "#fb923c20";
+    ctx.lineWidth = currentLane === 1 ? 2 : 1;
+    ctx.beginPath();
+    ctx.moveTo(0, TOP_GROUND);
+    ctx.lineTo(canvas.width, TOP_GROUND);
+    ctx.stroke();
+  }
+
+  function drawPopups() {
+    for (const p of popups) {
+      ctx.globalAlpha = p.life / 60;
+      ctx.fillStyle = p.color || COLORS.collectible;
+      ctx.font = "bold 14px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(p.text, p.x, p.y);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function checkCollisions() {
+    const catBox = {
+      x: cat.x + 5,
+      y: cat.grounded ? laneGroundY - cat.h : cat.y,
+      w: cat.w - 10,
+      h: cat.h,
+    };
+
+    // Obstacles (same lane only)
+    for (const obs of obstacles) {
+      if (obs.lane !== currentLane) continue;
+      const obsGround = getLaneGround(obs.lane);
+      if (
+        catBox.x < obs.x + obs.w &&
+        catBox.x + catBox.w > obs.x &&
+        catBox.y + catBox.h > obsGround - obs.h
+      ) {
+        gameOver();
+        return;
+      }
+    }
+
+    // Collectibles (same lane only)
+    for (const c of collectibles) {
+      if (c.collected || c.lane !== currentLane) continue;
+      const bobY = c.y + Math.sin(c.bobPhase) * 4;
+      if (
+        Math.abs(catBox.x + catBox.w / 2 - c.x) < 30 &&
+        Math.abs(catBox.y + catBox.h / 2 - bobY) < 30
+      ) {
+        c.collected = true;
+        score += c.value;
+        scoreDisplay.textContent = score.toString();
+        popups.push({ x: c.x, y: bobY - 10, text: `+${c.value}`, life: 60 });
+        // Burst star particles
+        const burstCount = 6 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < burstCount; i++) {
+          const angle = (Math.PI * 2 * i) / burstCount + Math.random() * 0.3;
+          const spd = 1.5 + Math.random() * 2.5;
+          starParticles.push({
+            x: c.x, y: bobY,
+            vx: Math.cos(angle) * spd,
+            vy: Math.sin(angle) * spd - 1,
+            size: 3 + Math.random() * 4,
+            life: 30,
+            color: Math.random() < 0.5 ? "#fbbf24" : "#fff8e1",
+          });
+        }
+        sfx.collect();
+      }
+    }
+  }
+
+  function gameOver() {
+    running = false;
+    sfx.hit();
+    if (score > best) {
+      best = score;
+      localStorage.setItem("flamegraph-runner-best", best.toString());
+      bestDisplay.textContent = best.toString();
+    }
+
+    finalScore.textContent = `${score}% CPU saved`;
+
+    const messages = [
+      "The flamegraph revealed the truth.",
+      "Profile before you optimise!",
+      "The best code is the code you delete.",
+      "Not bad for a cat on a keyboard.",
+      "Your cat has excellent taste in bottlenecks.",
+    ];
+
+    if (score >= 50) {
+      finalMsg.textContent = "Staff-level performance right there. 🔥";
+    } else if (score >= 20) {
+      finalMsg.textContent = messages[Math.floor(Math.random() * messages.length)];
+    } else {
+      finalMsg.textContent = "Keep profiling! Every % counts.";
+    }
+
+    gameOverScreen.classList.remove("hidden");
+  }
+
+  function update() {
+    frameCount++;
+
+    // Increase speed over time
+    speed = 3 + frameCount / 500;
+
+    // Move bars
+    for (const bar of bars) bar.x -= speed;
+    bars = bars.filter((b) => b.x + b.w > -10);
+    nextBarX -= speed;
+    generateBars();
+
+    // Move obstacles
+    for (const obs of obstacles) obs.x -= speed;
+    obstacles = obstacles.filter((o) => o.x + o.w > -10);
+
+    // Move collectibles
+    for (const c of collectibles) {
+      c.x -= speed;
+      c.bobPhase += 0.05;
+    }
+    collectibles = collectibles.filter((c) => c.x > -50);
+
+    // Spawn
+    if (frameCount % Math.max(60, 120 - Math.floor(frameCount / 200)) === 0) {
+      spawnObstacle();
+    }
+    if (frameCount % 90 === 45) {
+      spawnCollectible();
+    }
+
+    // Smooth lane transition
+    if (laneGroundY !== targetLaneGroundY) {
+      const diff = targetLaneGroundY - laneGroundY;
+      if (Math.abs(diff) < 0.5) {
+        laneGroundY = targetLaneGroundY;
+      } else {
+        laneGroundY += diff * 0.2;
+      }
+      if (cat.grounded) {
+        cat.y = laneGroundY - cat.h;
+      }
+    }
+
+    // Cat physics
+    if (!cat.grounded) {
+      cat.vy += cat.gravity;
+      cat.y += cat.vy;
+
+      const groundY = targetLaneGroundY - cat.h;
+      if (cat.y >= groundY && cat.vy > 0) {
+        cat.y = groundY;
+        cat.vy = 0;
+        cat.grounded = true;
+        cat.jumpsRemaining = 2;
+        laneGroundY = targetLaneGroundY;
+      }
+    }
+
+    // Popups
+    for (const p of popups) {
+      p.y -= 1;
+      p.life--;
+    }
+    popups = popups.filter((p) => p.life > 0);
+
+    // Star particles
+    for (const p of starParticles) {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.05;
+      p.life--;
+      p.size *= 0.97;
+    }
+    starParticles = starParticles.filter((p) => p.life > 0);
+
+    checkCollisions();
+  }
+
+  function draw() {
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    drawFlameBars();
+    drawGround();
+    drawObstacles();
+    drawCollectibles();
+    drawCat();
+    drawPopups();
+
+    // Score in game
+    ctx.fillStyle = COLORS.textMuted;
+    ctx.font = "12px monospace";
+    ctx.textAlign = "right";
+    ctx.fillText(`${score}% CPU saved`, canvas.width - 15, 25);
+
+    // Jump indicator dots
+    const jd1 = cat.jumpsRemaining >= 1 ? "●" : "○";
+    const jd2 = cat.jumpsRemaining >= 2 ? "●" : "○";
+    ctx.fillStyle = cat.jumpsRemaining > 0 ? "#fb923c" : COLORS.textMuted;
+    ctx.font = "10px monospace";
+    ctx.fillText(`${jd1}${jd2}`, canvas.width - 15, 40);
+
+    // Lane indicator
+    ctx.fillStyle = COLORS.textMuted;
+    ctx.font = "10px monospace";
+    ctx.textAlign = "right";
+    ctx.fillText(currentLane === 1 ? "▲ top" : "▼ bottom", canvas.width - 15, 55);
+  }
+
+  function gameLoop() {
+    if (!running) return;
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+  }
+
+  function jump() {
+    if (cat.jumpsRemaining > 0) {
+      const isDoubleJump = !cat.grounded;
+      cat.grounded = false;
+      if (cat.y >= laneGroundY - cat.h) cat.y = laneGroundY - cat.h;
+      cat.vy = isDoubleJump ? cat.jumpForce * 0.75 : cat.jumpForce;
+      cat.jumpsRemaining--;
+      sfx.jump();
+      if (isDoubleJump) {
+        score = Math.max(0, score - 5);
+        scoreDisplay.textContent = score.toString();
+        popups.push({ x: cat.x + 15, y: cat.y - 10, text: "−5", life: 45, color: "#fb923c" });
+      }
+    }
+  }
+
+  function startGame() {
+    score = 0;
+    frameCount = 0;
+    speed = 3;
+    scoreDisplay.textContent = "0";
+    currentLane = 0;
+    laneGroundY = GROUND_Y;
+    targetLaneGroundY = GROUND_Y;
+    cat.y = GROUND_Y - cat.h;
+    cat.vy = 0;
+    cat.grounded = true;
+    cat.jumpsRemaining = 2;
+    bars = [];
+    nextBarX = 0;
+    obstacles = [];
+    collectibles = [];
+    popups = [];
+    starParticles = [];
+    generateBars();
+
+    startScreen.classList.add("hidden");
+    gameOverScreen.classList.add("hidden");
+
+    running = true;
+    gameLoop();
+  }
+
+  // Controls
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "Space") {
+      e.preventDefault();
+      if (running) jump();
+      else startGame();
+    } else if (e.code === "ArrowUp") {
+      e.preventDefault();
+      if (running) switchLane(1);
+      else startGame();
+    } else if (e.code === "ArrowDown") {
+      e.preventDefault();
+      if (running) switchLane(0);
+    }
+  });
+
+  canvas.addEventListener("click", () => {
+    if (running) jump();
+    else startGame();
+  });
+
+  canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    touchStartY = e.touches[0].clientY;
+  });
+
+  canvas.addEventListener("touchend", (e) => {
+    e.preventDefault();
+    const deltaY = touchStartY - (e.changedTouches[0]?.clientY ?? touchStartY);
+    if (!running) {
+      startGame();
+    } else if (Math.abs(deltaY) > 30) {
+      switchLane(deltaY > 0 ? 1 : 0);
+    } else {
+      jump();
+    }
+  });
+
+  startBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    startGame();
+  });
+
+  restartBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    startGame();
+  });
+
+  // Initial draw
+  generateBars();
+  draw();
+</script>

@@ -1,0 +1,79 @@
+---
+import SocialIcons from "./SocialIcons.astro";
+---
+
+<footer class="mt-auto py-6 border-t border-surface-700">
+  <div class="max-w-5xl mx-auto px-6">
+    <!-- Dad joke generator -->
+    <div class="mb-4 text-center">
+      <button
+        id="joke-btn"
+        class="text-text-muted hover:text-flame-400 text-xs font-mono transition-all cursor-pointer group"
+      >
+        <span class="group-hover:hidden">🔥 click for a performance dad joke</span>
+        <span class="hidden group-hover:inline">go on, you know you want to</span>
+      </button>
+      <p
+        id="joke-text"
+        class="text-flame-400 text-sm font-mono mt-2 hidden transition-all"
+        style="text-shadow: 0 0 6px #fb923c40;"
+      >
+      </p>
+    </div>
+
+    <div class="flex items-center justify-between">
+      <p class="text-text-muted text-xs">
+        © {new Date().getFullYear()} Elena Tănăsoiu
+        <span class="text-text-muted/30 ml-2 select-none" title="Try the Konami code...">↑↑↓↓←→←→BA</span>
+        <span class="text-text-muted/50 ml-2 select-none text-xs" title="Press . for help">press <kbd class="text-flame-400/50">.</kbd> for secrets</span>
+      </p>
+      <SocialIcons />
+    </div>
+  </div>
+</footer>
+
+<script>
+  const jokes = [
+    "I told my manager we need to optimise. They said 'don't do it'. Technically correct.",
+    "I cache everything. My therapist says I have commitment issues.",
+    "Premature optimisation is the root of all evil. But late optimisation is the root of all pagers.",
+    "How do you make a slow page faster? You don't. You make it do less.",
+    "I profiled my morning routine. Turns out coffee is the bottleneck. Can't optimise that away.",
+    "My code runs in O(1). One very long operation.",
+    "My database query was so slow it applied for a mortgage while waiting.",
+    "What did the load balancer say at the party? 'Don't worry, I'll spread the work around.'",
+    "I asked my code why it was slow. It said 'I'm not slow, I'm thorough.'",
+    "Caching is just hoarding with a fancy name and an expiry date.",
+    "My pull request was so small it reduced latency by doing literally nothing. Best PR I ever wrote.",
+    "I don't always write benchmarks, but when I do, I run them twice and pick the faster one.",
+    "What do flamegraphs and onions have in common? Layers, and they both make you cry.",
+    "My favourite optimisation pattern: 'Do it never.' Works every time.",
+    "The server said it was fine. The flamegraph said it was lying.",
+    "I named my cat 'Mutex' because she blocks everything.",
+    "A cache miss walks into a bar. And then walks into the same bar. And then walks into the same bar.",
+    "I explain my job as 'I stare at colourful rectangles until I find the one that shouldn't be there.' My mum thinks I'm an art critic.",
+    "The five stages of performance debugging: denial, profiling, blame, 'oh it was DNS', acceptance.",
+    "Ruby's garbage collector and I have the same approach to cleaning. We'll get to it eventually, and you really can't rush us.",
+    "Why did the developer break up with their monitoring dashboard? Too many mixed signals.",
+    "A flamegraph is just a stack trace having a midlife crisis - suddenly very concerned about how wide it's gotten.",
+    "Profiling in production is like checking your bank balance after a night out. You know it's bad. You just need to know how bad.",
+    "Why don't performance engineers ever get lost? They always know where the hotspots are.",
+    "I love pickles and flamegraphs for the same reason: they both reveal what's been stewing for too long.",
+    "What do you call a Ruby method that takes forever? A proc-rastinator.",
+    "I moved from Romania to London for the weather. Just kidding. I moved for the lower latency.",
+  ];
+
+  const btn = document.getElementById("joke-btn");
+  const text = document.getElementById("joke-text");
+  let lastIndex = -1;
+
+  btn?.addEventListener("click", () => {
+    let index;
+    do { index = Math.floor(Math.random() * jokes.length); } while (index === lastIndex);
+    lastIndex = index;
+    if (text) {
+      text.textContent = jokes[index];
+      text.classList.remove("hidden");
+    }
+  });
+</script>

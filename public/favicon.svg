@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="flame" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#ea580c" />
+      <stop offset="50%" style="stop-color:#fb923c" />
+      <stop offset="100%" style="stop-color:#fdba74" />
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="6" fill="#0a0a0f"/>
+  <text x="16" y="22" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="18" fill="url(#flame)">ET</text>
+</svg>

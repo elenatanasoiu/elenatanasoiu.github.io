@@ -1,0 +1,93 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Hero from "../components/Hero.astro";
+import About from "../components/About.astro";
+import Speaking from "../components/Speaking.astro";
+import PostCard from "../components/PostCard.astro";
+import Footer from "../components/Footer.astro";
+import { getCollection } from "astro:content";
+
+const isDev = import.meta.env.DEV;
+
+const blogPosts = (await getCollection("blog"))
+  .filter((post) => isDev || !post.data.draft)
+  .sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime())
+  .slice(0, 3);
+
+const creativeWriting = (await getCollection("creative-writing"))
+  .sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime())
+  .slice(0, 2);
+---
+
+<Layout>
+  <Nav />
+
+  <main class="flex-1">
+    <Hero />
+    <About />
+    <Speaking />
+
+    <!-- Blog Section -->
+    <section id="blog" class="py-24 reveal">
+      <div class="max-w-5xl mx-auto px-6">
+        <h2 class="text-2xl font-bold mb-2">
+          <span class="text-flame-400 font-mono text-sm block mb-1">03.</span>
+          Blog
+        </h2>
+        <div class="h-px bg-gradient-to-r from-flame-500/50 to-transparent mb-8 max-w-xs"></div>
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {blogPosts.map((post) => (
+            <PostCard
+              title={post.data.title}
+              date={post.data.date}
+              description={post.data.description}
+              slug={post.id}
+              basePath="/blog"
+            />
+          ))}
+        </div>
+
+        {blogPosts.length > 0 && (
+          <div class="mt-8 text-center">
+            <a href="/blog" class="text-flame-400 hover:text-flame-300 text-sm font-medium">
+              View all posts →
+            </a>
+          </div>
+        )}
+      </div>
+    </section>
+
+    <!-- Creative Writing Section -->
+    {creativeWriting.length > 0 && (
+      <section id="writing" class="py-24 reveal">
+        <div class="max-w-5xl mx-auto px-6">
+          <h2 class="text-2xl font-bold mb-2">
+            <span class="text-flame-400 font-mono text-sm block mb-1">04.</span>
+            Creative Writing
+          </h2>
+          <div class="h-px bg-gradient-to-r from-flame-500/50 to-transparent mb-8 max-w-xs"></div>
+
+          <p class="text-text-secondary mb-8 max-w-lg">
+            Sometimes I write fiction. Here's what happens when a software engineer picks up a pen.
+          </p>
+
+          <div class="grid md:grid-cols-2 gap-6">
+            {creativeWriting.map((post) => (
+              <PostCard
+                title={post.data.title}
+                date={post.data.date}
+                description={post.data.description}
+                slug={post.id}
+                basePath="/writing"
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+    )}
+  </main>
+
+  <Footer />
+</Layout>

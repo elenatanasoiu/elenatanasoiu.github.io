@@ -1,0 +1,63 @@
+<section id="about" class="py-24 reveal">
+  <div class="max-w-5xl mx-auto px-6">
+    <h2 class="text-2xl font-bold mb-2">
+      <span class="text-flame-400 font-mono text-sm block mb-1">01.</span>
+      About
+    </h2>
+
+    <div
+      class="h-px bg-gradient-to-r from-flame-500/50 to-transparent mb-8 max-w-xs"
+    >
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-12">
+      <div class="md:col-span-2 space-y-4 text-text-secondary">
+        <p>
+          I'm a Staff Engineer on GitHub's <strong class="text-text-primary"
+            >Performance Engineering</strong
+          > team, where I spend my days profiling production traffic, diagnosing bottlenecks,
+          and making one of the world's largest Ruby on Rails applications faster.
+        </p>
+
+        <p>
+          My journey in tech started in Bucharest, Romania and took me through
+          London's vibrant Ruby community. I've grown from writing my first
+          RSpec tests to leading performance investigations that save millions of
+          CPU cycles across GitHub's infrastructure.
+        </p>
+
+        <p>
+          When I'm not staring at flamegraphs, you'll find me knitting,
+          painting, making terrible puns, or exploring the great
+          outdoors.
+        </p>
+      </div>
+
+      <div class="space-y-4">
+        <h3
+          class="text-text-primary font-semibold text-sm uppercase tracking-wider"
+        >
+          Things I work with
+        </h3>
+        <ul class="grid grid-cols-2 gap-2 text-sm text-text-secondary">
+          {
+            [
+              "Ruby / Rails",
+              "Go",
+              "Flamegraphs",
+              "Caching at Scale",
+              "Observability",
+              "Performance",
+              "MySQL",
+            ].map((tech) => (
+              <li class="flex items-center gap-2">
+                <span class="text-flame-400 text-xs">▸</span>
+                {tech}
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>

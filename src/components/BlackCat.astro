@@ -1,0 +1,357 @@
+<!-- Black cat that sleeps, wakes up, walks across, and sleeps again -->
+
+<style>
+  #cat-container {
+    position: fixed;
+    bottom: 3px;
+    left: 24px;
+    z-index: 40;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .cat-sprite {
+    width: 50px;
+    height: 34px;
+    position: relative;
+  }
+
+  /* === Body parts === */
+  .cat-body {
+    position: absolute;
+    bottom: 6px;
+    left: 12px;
+    width: 24px;
+    height: 13px;
+    background: #2a2a35;
+    border-radius: 50% 50% 40% 40%;
+  }
+
+  .cat-head {
+    position: absolute;
+    bottom: 14px;
+    left: 30px;
+    width: 13px;
+    height: 11px;
+    background: #2a2a35;
+    border-radius: 50% 50% 40% 40%;
+  }
+
+  .cat-ear-l, .cat-ear-r {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-left: 3px solid transparent;
+    border-right: 3px solid transparent;
+    border-bottom: 7px solid #2a2a35;
+  }
+
+  .cat-ear-l { bottom: 24px; left: 30px; transform: rotate(-10deg); }
+  .cat-ear-r { bottom: 24px; left: 37px; transform: rotate(10deg); }
+
+  .cat-eye {
+    position: absolute;
+    width: 3px;
+    height: 3.5px;
+    background: #fbbf24;
+    border-radius: 50% 50% 40% 40%;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    box-shadow: 0 0 3px #fbbf2460;
+  }
+
+  .cat-eye-l { bottom: 17px; left: 32px; }
+  .cat-eye-r { bottom: 17px; left: 37px; }
+
+  /* Blink animation */
+  @keyframes cat-eye-blink {
+    0%, 92%, 100% { transform: scaleY(1); }
+    96% { transform: scaleY(0.1); }
+  }
+
+  .state-walking .cat-eye,
+  .state-awake .cat-eye {
+    animation: cat-eye-blink 3.5s ease-in-out infinite;
+  }
+
+  /* Meow bubble */
+  .meow-bubble {
+    position: absolute;
+    bottom: 30px;
+    left: 42px;
+    font-size: 9px;
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+    opacity: 0;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  @keyframes meow-appear {
+    0% { opacity: 0; transform: translateY(0); }
+    15% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-12px); }
+  }
+
+  .cat-tail {
+    position: absolute;
+    bottom: 10px;
+    left: 0;
+    width: 16px;
+    height: 3px;
+    background: #2a2a35;
+    border-radius: 6px;
+    transform-origin: right center;
+  }
+
+  .cat-leg {
+    position: absolute;
+    bottom: 0;
+    width: 3px;
+    height: 0;
+    background: #2a2a35;
+    border-radius: 0 0 2px 2px;
+    transform-origin: top center;
+    transition: height 0.4s ease;
+  }
+
+  .cat-leg-fl { left: 31px; }
+  .cat-leg-fr { left: 35px; }
+  .cat-leg-bl { left: 14px; }
+  .cat-leg-br { left: 18px; }
+
+  .zzz {
+    position: absolute;
+    bottom: 28px;
+    left: 44px;
+    font-size: 10px;
+    color: var(--color-text-muted);
+    opacity: 0;
+  }
+
+  /* === SLEEPING STATE === */
+  .state-sleeping .cat-body {
+    width: 26px;
+    height: 11px;
+    bottom: 4px;
+    border-radius: 50%;
+    animation: cat-breathe 3s ease-in-out infinite;
+  }
+
+  .state-sleeping .cat-head {
+    bottom: 8px;
+    left: 32px;
+    width: 12px;
+    height: 10px;
+  }
+
+  .state-sleeping .cat-ear-l { bottom: 17px; left: 32px; }
+  .state-sleeping .cat-ear-r { bottom: 17px; left: 38px; }
+
+  .state-sleeping .cat-tail {
+    bottom: 6px;
+    left: 0;
+    width: 18px;
+    animation: tail-sleep 4s ease-in-out infinite;
+  }
+
+  .state-sleeping .cat-leg { height: 0; }
+  .state-sleeping .cat-eye { opacity: 0; }
+
+  .state-sleeping .zzz {
+    animation: zzz-float 3s ease-in-out infinite;
+  }
+
+  @keyframes cat-breathe {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(1.08); }
+  }
+
+  @keyframes tail-sleep {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(-5deg); }
+  }
+
+  @keyframes zzz-float {
+    0% { opacity: 0; transform: translate(0, 0) scale(0.8); }
+    30% { opacity: 0.6; }
+    100% { opacity: 0; transform: translate(6px, -14px) scale(1.1); }
+  }
+
+  /* === WALKING STATE === */
+  .state-walking .cat-body {
+    animation: walk-bob 0.35s ease-in-out infinite;
+  }
+
+  .state-walking .cat-head {
+    animation: walk-bob 0.35s ease-in-out infinite 0.05s;
+  }
+
+  .state-walking .cat-eye { opacity: 1; }
+
+  .state-walking .cat-tail {
+    bottom: 10px;
+    animation: tail-walk 0.7s ease-in-out infinite;
+  }
+
+  .state-walking .cat-leg { height: 8px; }
+
+  .state-walking .cat-leg-fl { animation: leg-step 0.35s ease-in-out infinite; }
+  .state-walking .cat-leg-fr { animation: leg-step 0.35s ease-in-out infinite 0.175s; }
+  .state-walking .cat-leg-bl { animation: leg-step 0.35s ease-in-out infinite 0.175s; }
+  .state-walking .cat-leg-br { animation: leg-step 0.35s ease-in-out infinite; }
+
+  .state-walking .zzz { display: none; }
+
+  @keyframes walk-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-1px); }
+  }
+
+  @keyframes leg-step {
+    0% { transform: rotate(-15deg); height: 8px; }
+    50% { transform: rotate(15deg); height: 6px; }
+    100% { transform: rotate(-15deg); height: 8px; }
+  }
+
+  @keyframes tail-walk {
+    0%, 100% { transform: rotate(-15deg); }
+    50% { transform: rotate(10deg); }
+  }
+
+  /* === AWAKE STATE === */
+  .state-awake .cat-body { animation: none; }
+  .state-awake .cat-eye { opacity: 1; }
+  .state-awake .cat-tail {
+    bottom: 10px;
+    animation: tail-walk 0.6s ease-in-out infinite;
+  }
+  .state-awake .cat-leg { height: 8px; }
+  .state-awake .zzz { display: none; }
+
+  /* Flip for walking left */
+  .facing-left .cat-sprite {
+    transform: scaleX(-1);
+  }
+</style>
+
+<div id="cat-container" class="state-sleeping" title="shhh... she's sleeping">
+  <div class="cat-sprite">
+    <div class="cat-tail"></div>
+    <div class="cat-body"></div>
+    <div class="cat-leg cat-leg-bl"></div>
+    <div class="cat-leg cat-leg-br"></div>
+    <div class="cat-leg cat-leg-fl"></div>
+    <div class="cat-leg cat-leg-fr"></div>
+    <div class="cat-head"></div>
+    <div class="cat-ear-l"></div>
+    <div class="cat-ear-r"></div>
+    <div class="cat-eye cat-eye-l"></div>
+    <div class="cat-eye cat-eye-r"></div>
+    <div class="zzz">z</div>
+    <div class="meow-bubble" id="meow-bubble">meow</div>
+  </div>
+</div>
+
+<script>
+  const cat = document.getElementById("cat-container");
+  const meowBubble = document.getElementById("meow-bubble");
+  if (cat) {
+    let state: "sleeping" | "awake" | "walking" = "sleeping";
+    let currentLeft = 24;
+    let isOnRight = false;
+    let meowInterval: ReturnType<typeof setInterval>;
+
+    const meows = ["meow", "mew", "prr", "mrrp", "mrow", "nya"];
+
+    function showMeow() {
+      if (!meowBubble) return;
+      meowBubble.textContent = meows[Math.floor(Math.random() * meows.length)];
+      meowBubble.style.animation = "none";
+      meowBubble.offsetHeight; // force reflow
+      meowBubble.style.animation = "meow-appear 1.5s ease-out forwards";
+    }
+
+    function startMeowing() {
+      showMeow();
+      meowInterval = setInterval(showMeow, 3000 + Math.random() * 2000);
+    }
+
+    function stopMeowing() {
+      clearInterval(meowInterval);
+      if (meowBubble) meowBubble.style.animation = "none";
+    }
+
+    function setState(s: typeof state) {
+      state = s;
+      cat.className = `state-${s}`;
+      if (s === "sleeping") {
+        cat.title = "shhh... she's sleeping";
+        stopMeowing();
+      } else if (s === "awake") {
+        cat.title = "meow!";
+        stopMeowing();
+      } else {
+        cat.title = "";
+        startMeowing();
+      }
+    }
+
+    function walkTo(targetLeft: number, onDone: () => void) {
+      setState("walking");
+
+      if (targetLeft > currentLeft) {
+        cat.classList.remove("facing-left");
+      } else {
+        cat.classList.add("facing-left");
+      }
+
+      const distance = Math.abs(targetLeft - currentLeft);
+      const duration = distance * 18;
+
+      cat.style.transition = `left ${duration}ms linear`;
+      cat.style.left = `${targetLeft}px`;
+      currentLeft = targetLeft;
+
+      setTimeout(onDone, duration);
+    }
+
+    function doWalkCycle() {
+      if (state === "walking") return;
+
+      setState("awake");
+
+      setTimeout(() => {
+        const screenWidth = window.innerWidth;
+        const target = isOnRight ? 24 : screenWidth - 80;
+
+        walkTo(target, () => {
+          isOnRight = !isOnRight;
+          setState("sleeping");
+          const nextWalk = 45000 + Math.random() * 60000;
+          setTimeout(doWalkCycle, nextWalk);
+        });
+      }, 1500);
+    }
+
+    cat.addEventListener("mouseenter", () => {
+      if (state === "sleeping") setState("awake");
+    });
+
+    cat.addEventListener("mouseleave", () => {
+      if (state === "awake") {
+        setTimeout(() => {
+          if (state === "awake") setState("sleeping");
+        }, 2000);
+      }
+    });
+
+    cat.addEventListener("click", () => {
+      if (state !== "walking") doWalkCycle();
+    });
+
+    const firstWalk = 30000 + Math.random() * 30000;
+    setTimeout(doWalkCycle, firstWalk);
+  }
+</script>

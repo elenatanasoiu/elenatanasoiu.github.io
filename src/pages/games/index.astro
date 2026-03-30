@@ -1,0 +1,81 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Nav from "../../components/Nav.astro";
+import Footer from "../../components/Footer.astro";
+
+const games = [
+  {
+    title: "Flamegraph Runner",
+    emoji: "🏃‍♀️",
+    description: "A black cat runs across flamegraphs, jumping over hot bars and collecting CPU savings.",
+    href: "/games/flamegraph-runner",
+    controls: "Space / Tap to jump",
+  },
+  {
+    title: "N+1 Swatter",
+    emoji: "🧹",
+    description: "Swat duplicate database queries before they multiply. Miss one and you get N more.",
+    href: "/games/n1-swatter",
+    controls: "Click / Tap queries to swat",
+  },
+  {
+    title: "Cache Cat",
+    emoji: "🐈‍⬛",
+    description: "Overcooked-style plate-spinning — serve requests from cache, but entries go stale and slots are limited.",
+    href: "/games/cache-cat",
+    controls: "Click cache slots & requests · Keys 1-6",
+  },
+  {
+    title: "Pickle Panic",
+    emoji: "🥒",
+    description: "Tetris meets garbage collection. Stack code objects before the GC cat freezes everything.",
+    href: "/games/pickle-panic",
+    controls: "←→ move · ↑ rotate · ↓ drop · swipe on mobile",
+  },
+];
+---
+
+<Layout ogImage="/images/og-games.png" title="" ogImage="/images/og-games.png" description="Browser games by a performance engineer who should probably be profiling something.">
+  <Nav />
+
+  <main class="flex-1 pt-28 pb-16">
+    <div class="max-w-5xl mx-auto px-6">
+      <h1 class="text-3xl md:text-4xl font-bold mb-4">Games</h1>
+      <p class="text-text-secondary mb-12 max-w-lg">
+        What happens when a performance engineer gets distracted. All games feature a 7kg black Bombay cat.
+      </p>
+
+      <div class="grid md:grid-cols-2 gap-6">
+        {games.map((game) => (
+          <a
+            href={game.href}
+            class="group block bg-surface-800 border border-surface-600 rounded-xl p-6 hover:border-flame-500/50 transition-all"
+          >
+            <div class="space-y-3">
+              <span class="text-4xl">{game.emoji}</span>
+              <h2 class="text-text-primary font-semibold text-lg group-hover:text-flame-400 transition-colors">
+                {game.title}
+              </h2>
+              <p class="text-text-secondary text-sm">{game.description}</p>
+              <p class="text-text-muted text-xs font-mono">{game.controls}</p>
+              <span class="inline-block text-flame-400 text-sm font-medium group-hover:translate-x-1 transition-transform">
+                Play →
+              </span>
+            </div>
+          </a>
+        ))}
+      </div>
+
+      <div class="mt-10 text-center">
+        <a
+          href="/games/review"
+          class="inline-block text-flame-400 hover:text-flame-300 text-sm font-mono transition-colors"
+        >
+          🏆 Performance Review →
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <Footer />
+</Layout>

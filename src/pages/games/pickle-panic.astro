@@ -1,0 +1,624 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Nav from "../../components/Nav.astro";
+import Footer from "../../components/Footer.astro";
+---
+<Layout ogImage="/images/og-pickle-panic.png" title="" ogImage="/images/og-pickle-panic.png" description="Tetris meets garbage collection. Stack code objects before the GC cat freezes everything.">
+  <Nav />
+  <main class="flex-1 pt-24 pb-8">
+    <div class="max-w-4xl mx-auto px-6 text-center">
+      <h1 class="text-2xl md:text-3xl font-bold mb-2">🥒 Pickle Panic</h1>
+      <p class="text-text-secondary text-sm mb-4 max-w-md mx-auto">Tetris meets garbage collection. Clear lines — but beware the GC cat.</p>
+      <div class="relative inline-block">
+        <canvas id="game" width="360" height="640" class="rounded-xl border border-surface-600 bg-surface-900 max-w-full"></canvas>
+        <div id="start-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-900/90 rounded-xl">
+          <div class="text-5xl mb-4">🥒</div>
+          <h2 class="text-text-primary font-bold text-xl mb-2">Pickle Panic</h2>
+          <p class="text-text-secondary text-xs mb-1 max-w-[250px]">Stack code blocks before the GC cat freezes everything.</p>
+          <p class="text-flame-400 text-xs mb-4 max-w-[250px]">Collect pickles for bonuses!</p>
+          <button id="start-btn" class="bg-flame-500 hover:bg-flame-600 text-surface-900 font-bold py-2 px-8 rounded-xl text-sm transition-colors cursor-pointer">START</button>
+          <p class="text-text-muted text-xs mt-4 font-mono">↑ rotate · ←→ move · ↓ soft drop · space hard drop · D defrag · P pickle</p>
+          <p class="text-text-muted text-xs font-mono">mobile: swipe ←→↓ · tap to rotate</p>
+        </div>
+        <div id="game-over" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-900/90 rounded-xl hidden">
+          <div class="text-4xl mb-3">😿</div>
+          <h2 id="game-over-title" class="text-text-primary font-bold text-xl mb-3">Heap Overflow!</h2>
+          <div class="text-left text-sm font-mono space-y-1 mb-4">
+            <p><span class="text-text-muted">Score: </span><span id="final-score" class="text-flame-400">0</span></p>
+            <p><span class="text-text-muted">Lines: </span><span id="final-lines" class="text-teal-400">0</span></p>
+            <p><span class="text-text-muted">GC Pauses: </span><span id="final-pauses" class="text-purple-400">0</span></p>
+            <p><span class="text-text-muted">GC Time: </span><span id="final-gc-time" class="text-purple-400">0s</span></p>
+            <p><span class="text-text-muted">Defrags: </span><span id="final-defrags" class="text-teal-400">0</span></p>
+            <p><span class="text-text-muted">Best: </span><span id="final-best" class="text-flame-400">0</span></p>
+          </div>
+          <button id="restart-btn" class="bg-flame-500 hover:bg-flame-600 text-surface-900 font-bold py-2 px-8 rounded-xl text-sm transition-colors cursor-pointer">RETRY</button>
+        </div>
+      </div>
+      <div class="flex justify-center gap-6 mt-4 text-xs font-mono">
+        <div><span class="text-text-muted">Score: </span><span id="hud-score" class="text-flame-400">0</span></div>
+        <div><span class="text-text-muted">Lines: </span><span id="hud-lines" class="text-teal-400">0</span></div>
+        <div><span class="text-text-muted">Level: </span><span id="hud-level" class="text-text-primary">1</span></div>
+        <div><span class="text-text-muted">Best: </span><span id="hud-best" class="text-flame-400">0</span></div>
+        <div id="hud-defrag" class="hidden"><button id="defrag-btn" class="bg-teal-600 hover:bg-teal-500 text-white font-bold py-0.5 px-2 rounded text-xs cursor-pointer transition-colors">⚡ DEFRAG <span id="hud-defrag-count">0</span></button></div>
+      </div>
+      <div class="mt-6">
+        <a href="/games" class="text-text-muted hover:text-flame-400 text-sm font-mono transition-colors">← back to games</a>
+      </div>
+    </div>
+  </main>
+  <Footer />
+</Layout>
+
+<script>
+const canvas = document.getElementById("game") as HTMLCanvasElement;
+const ctx = canvas.getContext("2d")!;
+const $ = (id: string) => document.getElementById(id)!;
+const startScreen = $("start-screen"), gameOverScreen = $("game-over");
+const W = canvas.width, H = canvas.height;
+const COLS = 10, ROWS = 20, CELL = 24;
+const BX = 12, BY = 28, BW = COLS * CELL, BH = ROWS * CELL;
+const C = {
+  bg: "#050508", grid: "#13131f", border: "#1e1e2e",
+  pieces: ["#4ade80","#fb923c","#22c55e","#16a34a","#14b8a6","#7c3aed","#a78bfa"],
+  ghost: "rgba(249,115,22,0.15)", marked: "rgba(124,58,237,0.5)",
+  gcOverlay: "rgba(124,58,237,0.25)", gcText: "#a78bfa",
+};
+const SHAPES: number[][][] = [
+  [[1,1],[1,1]], [[0,1,0],[1,1,1]], [[1,1,0],[0,1,1]], [[0,1,1],[1,1,0]],
+  [[1,0],[1,0],[1,1]], [[0,1],[0,1],[1,1]], [[1],[1],[1],[1]],
+];
+interface Piece { shape: number[][]; x: number; y: number; type: number }
+interface Popup { x: number; y: number; text: string; life: number; color: string }
+
+let board: number[][] = [], markedRows = new Set<number>(), current: Piece | null = null;
+let nextType = 0, running = false, score = 0, lines = 0, level = 1;
+let gcPauses = 0, totalGcTime = 0, frameCount = 0, dropTimer = 0;
+let best = parseInt(localStorage.getItem("pickle-panic-best") || "0");
+let gcMeter = 0, gcFreezeEnd = 0, gcActive = false;
+let catX = -40, catPhase = 0, popups: Popup[] = [];
+let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+const GC_THRESHOLD = 100;
+let defragCharges = 0, defragLineCounter = 0, defragUsed = 0;
+let defragFlashTimer = 0, defragFlashRows: number[] = [];
+let defragInteractive = false, defragSwapFirst: {r: number, c: number} | null = null;
+let defragInteractiveTimer = 0, defragInteractiveRows: number[] = [];
+
+// Pickle power-up state
+let pickleLineCounter = 0, pickleActive = false, pickleEnd = 0;
+let pickleColFlash = -1, pickleColFlashEnd = 0;
+interface PickleEmoji { x: number; y: number; vy: number; life: number }
+let pickleEmojis: PickleEmoji[] = [];
+
+// Pickle rain (decorative during N+1 storm)
+interface PickleRain { x: number; y: number; speed: number; size: number }
+let pickleRaindrops: PickleRain[] = [];
+
+const PICKLE_PUNS = [
+  "You're in a real pickle now!",
+  "That's the last dill!",
+  "Brine over, game over!",
+  "You got yourself in a pickle jar!",
+  "Gherkin your way out wasn't an option!",
+];
+
+// Performance event state
+const LEAKED_BLOCK = -1;
+let nPlusOneActive = false, nPlusOneEnd = 0, nPlusOneWarnEnd = 0;
+let memLeakActive = false, memLeakEnd = 0, memLeakCol = -1, memLeakWarnEnd = 0, memLeakNextBlock = 0, memLeakBlocksPlaced = 0;
+let cacheMissActive = false, cacheMissWarnEnd = 0;
+let lastNPlusOne = 0, lastMemLeak = 0, lastCacheMiss = 0;
+
+// Audio
+let audioCtx: AudioContext | null = null;
+function getAudio(): AudioContext { if (!audioCtx) audioCtx = new AudioContext(); if (audioCtx.state === "suspended") audioCtx.resume(); return audioCtx; }
+function playTone(freq: number, dur: number, freqEnd?: number, type: OscillatorType = "sine") {
+  try {
+    const ac = getAudio(), osc = ac.createOscillator(), g = ac.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(freq, ac.currentTime);
+    if (freqEnd) osc.frequency.linearRampToValueAtTime(freqEnd, ac.currentTime + dur);
+    g.gain.setValueAtTime(0.06, ac.currentTime); g.gain.linearRampToValueAtTime(0, ac.currentTime + dur);
+    osc.connect(g).connect(ac.destination); osc.start(); osc.stop(ac.currentTime + dur);
+  } catch {}
+}
+function sndClick() { playTone(400, 0.05); }
+function sndSweep() { playTone(300, 0.2, 600); }
+function sndGcStart() { playTone(80, 0.3, undefined, "sawtooth"); }
+function sndGcEnd() { playTone(500, 0.15, 700); }
+function sndDefrag() { playTone(200, 0.4, 800, "square"); }
+function sndNPlusOne() { playTone(150, 0.15, 300, "sawtooth"); }
+function sndMemLeak() { playTone(100, 0.3, 60, "sine"); }
+function sndCacheMiss() { playTone(500, 0.1, 200, "square"); }
+function sndPickle() { playTone(600, 0.15, 900, "sine"); }
+
+function resetBoard() { board = Array.from({length: ROWS}, () => Array(COLS).fill(0)); }
+function newPiece(t: number): Piece {
+  const shape = SHAPES[t].map(r => [...r]);
+  return { shape, x: Math.floor((COLS - shape[0].length) / 2), y: 0, type: t };
+}
+function randomType(): number {
+  const pool = level < 4 ? [0,1,2,3,4,6,1,2,6] : [0,1,2,3,4,5,6,1,2,3,6];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+function rotatePiece(p: Piece): number[][] {
+  const rows = p.shape.length, cols = p.shape[0].length;
+  const rot: number[][] = Array.from({length: cols}, () => Array(rows).fill(0));
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) rot[c][rows-1-r] = p.shape[r][c];
+  return rot;
+}
+function collides(shape: number[][], x: number, y: number): boolean {
+  for (let r = 0; r < shape.length; r++) for (let c = 0; c < shape[r].length; c++)
+    if (shape[r][c]) { const bx = x+c, by = y+r; if (bx<0||bx>=COLS||by>=ROWS) return true; if (by>=0&&board[by][bx]) return true; }
+  return false;
+}
+function lockPiece() {
+  if (!current) return;
+  for (let r = 0; r < current.shape.length; r++) for (let c = 0; c < current.shape[r].length; c++)
+    if (current.shape[r][c]) { const by=current.y+r, bx=current.x+c; if (by<0) { endGame(); return; } board[by][bx]=current.type+1; }
+  sndClick(); checkLines(); spawnPiece();
+}
+function checkLines() {
+  let cleared = 0;
+  for (let r = ROWS-1; r >= 0; r--) if (board[r].every(c => c > 0)) { markedRows.add(r); cleared++; }
+  if (cleared > 0) {
+    const pts = [0,100,300,500,800][Math.min(cleared,4)] * level;
+    score += pts; lines += cleared; level = Math.floor(lines/10)+1;
+    gcMeter += cleared * (cleared >= 4 ? 30 : cleared >= 3 ? 20 : 12);
+    sndSweep();
+    defragLineCounter += cleared;
+    while (defragLineCounter >= 10) { defragLineCounter -= 10; defragCharges++; popups.push({ x: BX+BW/2, y: BY+BH/2-30, text: "DEFRAG READY!", life: 60, color: "#14b8a6" }); }
+    popups.push({ x: BX+BW/2, y: BY+BH/2, text: cleared>=4 ? `MAJOR GC! +${pts}` : `+${pts}`, life: 60, color: cleared>=4 ? "#a78bfa" : "#fb923c" });
+    pickleLineCounter += cleared;
+    while (pickleLineCounter >= 15) { pickleLineCounter -= 15; pickleActive = true; pickleEnd = frameCount + 180; sndPickle(); popups.push({ x: BX+BW/2, y: BY+40, text: "🥒 PICKLE! Press P!", life: 90, color: "#22c55e" }); }
+  }
+}
+function clearMarkedRows() {
+  if (!markedRows.size) return;
+  for (const r of Array.from(markedRows).sort((a,b) => b-a)) { board.splice(r,1); board.unshift(Array(COLS).fill(0)); }
+  markedRows.clear();
+}
+function activatePickle() {
+  if (!pickleActive || gcActive || !running) return;
+  pickleActive = false;
+  const col = Math.floor(Math.random() * COLS);
+  let cleared = 0;
+  for (let r = 0; r < ROWS; r++) if (board[r][col]) {
+    pickleEmojis.push({ x: BX + col * CELL + CELL / 2, y: BY + r * CELL, vy: -(2 + Math.random() * 3), life: 60 });
+    board[r][col] = 0; cleared++;
+  }
+  if (cleared > 0) {
+    pickleColFlash = col; pickleColFlashEnd = frameCount + 20;
+    const pts = cleared * 50 * level; score += pts; sndPickle();
+    popups.push({ x: BX + BW / 2, y: BY + BH / 2, text: `🥒 PICKLE CLEAR! +${pts}`, life: 60, color: "#4ade80" });
+    markedRows.clear();
+    for (let r = ROWS - 1; r >= 0; r--) if (board[r].every(c => c > 0)) markedRows.add(r);
+  }
+}
+function activateDefrag() {
+  if (gcActive || !running || defragFlashTimer > 0) return;
+  // Pressing D again during interactive defrag ends it early
+  if (defragInteractive) { finishDefrag(); return; }
+  if (defragCharges <= 0) return;
+  const targets: number[] = [];
+  for (let r = ROWS - 1; r >= 0 && targets.length < 2; r--) if (board[r].some(c => c > 0)) targets.push(r);
+  if (targets.length === 0) return;
+  defragCharges--; defragUsed++;
+  // Defrag clears leaked memory blocks
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (board[r][c] === LEAKED_BLOCK) board[r][c] = 0;
+  defragInteractive = true; defragInteractiveRows = targets;
+  defragInteractiveTimer = 180; defragSwapFirst = null;
+  sndDefrag();
+  popups.push({ x: BX+BW/2, y: BY+BH/2, text: "DEFRAG! Swap blocks!", life: 60, color: "#14b8a6" });
+}
+function finishDefrag() {
+  defragFlashRows = [...defragInteractiveRows]; defragFlashTimer = 18;
+  defragInteractive = false; defragInteractiveRows = [];
+  defragSwapFirst = null; defragInteractiveTimer = 0;
+}
+function defragSwapBlock(r: number, c: number) {
+  if (!defragInteractive || !defragInteractiveRows.includes(r)) return;
+  if (!defragSwapFirst) {
+    if (!board[r][c]) return;
+    defragSwapFirst = {r, c}; sndClick(); return;
+  }
+  if (r === defragSwapFirst.r && c === defragSwapFirst.c) { defragSwapFirst = null; return; }
+  const {r: r1, c: c1} = defragSwapFirst;
+  const tmp = board[r1][c1]; board[r1][c1] = board[r][c]; board[r][c] = tmp;
+  defragSwapFirst = null; sndClick();
+  const completed = defragInteractiveRows.filter(ir => board[ir].every(cell => cell > 0));
+  if (completed.length > 0) {
+    const pts = [0,100,300,500,800][Math.min(completed.length,4)] * level * 2;
+    score += pts; lines += completed.length; level = Math.floor(lines/10)+1;
+    sndSweep();
+    popups.push({ x: BX+BW/2, y: BY+BH/2, text: `DEFRAG ×2! +${pts}`, life: 60, color: "#14b8a6" });
+    defragLineCounter += completed.length;
+    while (defragLineCounter >= 10) { defragLineCounter -= 10; defragCharges++; popups.push({ x: BX+BW/2, y: BY+BH/2-30, text: "DEFRAG READY!", life: 60, color: "#14b8a6" }); }
+    for (const cr of completed.sort((a,b) => b-a)) { board.splice(cr, 1); board.unshift(Array(COLS).fill(0)); }
+    defragInteractiveRows = defragInteractiveRows
+      .filter(ir => !completed.includes(ir))
+      .map(ir => { let shift = 0; for (const cr of completed) { if (ir < cr) shift++; } return ir + shift; });
+    markedRows.clear();
+    for (let ri = ROWS - 1; ri >= 0; ri--) if (board[ri].every(cell => cell > 0)) markedRows.add(ri);
+    if (defragInteractiveRows.length === 0) { defragInteractive = false; defragSwapFirst = null; defragInteractiveTimer = 0; }
+  }
+}
+function spawnPiece() {
+  if (cacheMissActive) cacheMissActive = false;
+  current = newPiece(nextType); nextType = randomType();
+  if (collides(current.shape, current.x, current.y)) endGame();
+}
+function ghostY(): number {
+  if (!current) return 0;
+  let gy = current.y; while (!collides(current.shape, current.x, gy+1)) gy++; return gy;
+}
+function triggerGC(minor = false) {
+  gcActive = true; catX = -40; catPhase = 0; sndGcStart();
+  if (minor) { gcFreezeEnd = frameCount+30; gcPauses++; totalGcTime += 0.5; gcMeter = 0;
+    popups.push({ x: BX+BW/2, y: BY+60, text: "minor GC", life: 30, color: "#7c3aed" }); return; }
+  const pauseMs = (800 + markedRows.size * 400) * (1 + (level-1) * 0.15);
+  gcFreezeEnd = frameCount + Math.ceil(pauseMs / 16.67);
+  gcPauses++; totalGcTime += pauseMs/1000;
+  popups.push({ x: BX+BW/2, y: BY+60, text: "GC PAUSE!", life: Math.ceil(pauseMs/16.67), color: C.gcText });
+}
+
+// Input
+function moveL() { if (current && !collides(current.shape, current.x-1, current.y)) current.x--; }
+function moveR() { if (current && !collides(current.shape, current.x+1, current.y)) current.x++; }
+function softDrop() { if (current && !collides(current.shape, current.x, current.y+1)) { current.y++; score++; } }
+function hardDrop() { if (!current) return; while (!collides(current.shape, current.x, current.y+1)) { current.y++; score+=2; } lockPiece(); }
+function rotate() {
+  if (!current) return;
+  const rot = rotatePiece(current);
+  for (const dx of [0,-1,1,-2,2]) if (!collides(rot, current.x+dx, current.y)) { current.shape=rot; current.x+=dx; return; }
+}
+document.addEventListener("keydown", (e) => {
+  if (!running || gcActive) {
+    if ((e.code==="Space"||e.code==="Enter") && !running && !gcActive) {
+      e.preventDefault(); startGame();
+    } return;
+  }
+  if (defragInteractive) {
+    if (e.code === "KeyD") { e.preventDefault(); activateDefrag(); }
+    return;
+  }
+  const acts: Record<string,()=>void> = { ArrowLeft: moveL, ArrowRight: moveR, ArrowDown: softDrop, ArrowUp: rotate, Space: hardDrop, KeyD: activateDefrag, KeyP: activatePickle };
+  if (acts[e.code]) { e.preventDefault(); acts[e.code](); }
+});
+canvas.addEventListener("touchstart", (e) => {
+  e.preventDefault(); const t = e.touches[0]; touchStartX=t.clientX; touchStartY=t.clientY; touchStartTime=Date.now();
+}, {passive: false});
+canvas.addEventListener("touchend", (e) => {
+  e.preventDefault();
+  if (!running && !gcActive) { startGame(); return; }
+  if (!running || gcActive) return;
+  const t=e.changedTouches[0], dx=t.clientX-touchStartX, dy=t.clientY-touchStartY;
+  if (defragInteractive) {
+    if (Math.sqrt(dx*dx+dy*dy) < 20 && Date.now()-touchStartTime < 300) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
+      const px = (t.clientX - rect.left) * scaleX, py = (t.clientY - rect.top) * scaleY;
+      const bc = Math.floor((px - BX) / CELL), br = Math.floor((py - BY) / CELL);
+      if (bc >= 0 && bc < COLS && br >= 0 && br < ROWS) defragSwapBlock(br, bc);
+    }
+    return;
+  }
+  if (Math.sqrt(dx*dx+dy*dy) < 20 && Date.now()-touchStartTime < 300) { rotate(); return; }
+  if (Math.abs(dx) > Math.abs(dy)) { dx<0 ? moveL() : moveR(); } else if (dy > 30) hardDrop();
+}, {passive: false});
+$("start-btn").addEventListener("click", () => startGame());
+$("restart-btn").addEventListener("click", () => startGame());
+$("defrag-btn").addEventListener("click", () => activateDefrag());
+canvas.addEventListener("click", (e) => {
+  if (!defragInteractive) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
+  const px = (e.clientX - rect.left) * scaleX, py = (e.clientY - rect.top) * scaleY;
+  const c = Math.floor((px - BX) / CELL), r = Math.floor((py - BY) / CELL);
+  if (c >= 0 && c < COLS && r >= 0 && r < ROWS) defragSwapBlock(r, c);
+});
+
+// Lifecycle
+function startGame() {
+  startScreen.classList.add("hidden"); gameOverScreen.classList.add("hidden");
+  resetBoard(); markedRows.clear(); popups = [];
+  score=0; lines=0; level=1; gcPauses=0; totalGcTime=0; frameCount=0; dropTimer=0; gcMeter=0; gcActive=false; gcFreezeEnd=0; catX=-40; catPhase=0;
+  defragCharges=0; defragLineCounter=0; defragUsed=0; defragFlashTimer=0; defragFlashRows=[];
+  defragInteractive=false; defragSwapFirst=null; defragInteractiveTimer=0; defragInteractiveRows=[];
+  pickleLineCounter=0; pickleActive=false; pickleEnd=0; pickleColFlash=-1; pickleColFlashEnd=0; pickleEmojis=[]; pickleRaindrops=[];
+  nPlusOneActive=false; nPlusOneEnd=0; nPlusOneWarnEnd=0;
+  memLeakActive=false; memLeakEnd=0; memLeakCol=-1; memLeakWarnEnd=0; memLeakNextBlock=0; memLeakBlocksPlaced=0;
+  cacheMissActive=false; cacheMissWarnEnd=0;
+  lastNPlusOne=0; lastMemLeak=0; lastCacheMiss=0;
+  nextType = randomType(); spawnPiece(); running = true; requestAnimationFrame(gameLoop);
+}
+function endGame() {
+  running = false; current = null;
+  if (score > best) { best = score; localStorage.setItem("pickle-panic-best", best.toString()); }
+  $("game-over-title").textContent = PICKLE_PUNS[Math.floor(Math.random() * PICKLE_PUNS.length)];
+  $("final-score").textContent = score.toString(); $("final-lines").textContent = lines.toString();
+  $("final-pauses").textContent = gcPauses.toString(); $("final-gc-time").textContent = totalGcTime.toFixed(1)+"s";
+  $("final-best").textContent = best.toString(); $("final-defrags").textContent = defragUsed.toString(); gameOverScreen.classList.remove("hidden");
+}
+
+// Performance events
+function updatePerfEvents() {
+  if (level < 3) return;
+  // Initialize timers on first entry at level 3+
+  if (lastCacheMiss === 0) { lastNPlusOne = frameCount; lastMemLeak = frameCount; lastCacheMiss = frameCount; }
+  const canSchedule = !gcActive && !defragInteractive && defragFlashTimer <= 0;
+  // N+1 Query Storm
+  if (nPlusOneWarnEnd > 0 && frameCount >= nPlusOneWarnEnd && canSchedule) {
+    nPlusOneWarnEnd = 0; nPlusOneActive = true; nPlusOneEnd = frameCount + 300; sndNPlusOne();
+    popups.push({ x: BX+BW/2, y: BY+40, text: "⚡ N+1 STORM!", life: 90, color: "#f59e0b" });
+  }
+  if (nPlusOneActive && frameCount >= nPlusOneEnd) { nPlusOneActive = false; }
+  if (canSchedule && !nPlusOneActive && nPlusOneWarnEnd === 0 && frameCount - lastNPlusOne >= 2700) {
+    nPlusOneWarnEnd = frameCount + 60; lastNPlusOne = frameCount;
+  }
+  // Memory Leak
+  if (memLeakWarnEnd > 0 && frameCount >= memLeakWarnEnd && canSchedule) {
+    memLeakWarnEnd = 0; memLeakActive = true; memLeakEnd = frameCount + 480;
+    memLeakCol = Math.floor(Math.random() * COLS); memLeakBlocksPlaced = 0;
+    memLeakNextBlock = frameCount + 120; sndMemLeak();
+    popups.push({ x: BX+BW/2, y: BY+40, text: "💧 MEMORY LEAK!", life: 90, color: "#6b7280" });
+  }
+  if (memLeakActive && !defragInteractive) {
+    if (frameCount >= memLeakNextBlock && memLeakBlocksPlaced < 4) {
+      for (let r = ROWS - 1; r >= 0; r--) {
+        if (board[r][memLeakCol] === 0) { board[r][memLeakCol] = LEAKED_BLOCK; memLeakBlocksPlaced++; break; }
+      }
+      memLeakNextBlock = frameCount + 120;
+      if (memLeakBlocksPlaced > 1) sndMemLeak();
+    }
+    if (frameCount >= memLeakEnd || memLeakBlocksPlaced >= 4) { memLeakActive = false; }
+  }
+  if (canSchedule && !memLeakActive && memLeakWarnEnd === 0 && frameCount - lastMemLeak >= 3600) {
+    memLeakWarnEnd = frameCount + 60; lastMemLeak = frameCount;
+  }
+  // Cache Miss
+  if (cacheMissWarnEnd > 0 && frameCount >= cacheMissWarnEnd && canSchedule) {
+    cacheMissWarnEnd = 0; cacheMissActive = true; sndCacheMiss();
+    popups.push({ x: BX+BW/2, y: BY+40, text: "❌ CACHE MISS!", life: 60, color: "#ef4444" });
+  }
+  if (canSchedule && !cacheMissActive && cacheMissWarnEnd === 0 && frameCount - lastCacheMiss >= 1800) {
+    cacheMissWarnEnd = frameCount + 60; lastCacheMiss = frameCount;
+  }
+}
+
+// Update
+function update() {
+  gcMeter += 0.08 + level * 0.03;
+  if (gcMeter > GC_THRESHOLD && !gcActive && defragFlashTimer <= 0 && !defragInteractive) { triggerGC(markedRows.size === 0); }
+  if (gcActive) {
+    catX += 3; catPhase += 0.15;
+    if (frameCount >= gcFreezeEnd) { gcActive=false; gcMeter=0; clearMarkedRows(); catX=-40; sndGcEnd(); }
+    return;
+  }
+  updatePerfEvents();
+  // Pickle power-up timer
+  if (pickleActive && frameCount >= pickleEnd) pickleActive = false;
+  // Pickle column flash timer
+  if (pickleColFlash >= 0 && frameCount >= pickleColFlashEnd) pickleColFlash = -1;
+  // Update pickle emojis
+  pickleEmojis = pickleEmojis.map(p => ({...p, y: p.y + p.vy, life: p.life - 1})).filter(p => p.life > 0);
+  // Pickle rain during N+1 storm
+  if (nPlusOneActive && Math.random() < 0.15) {
+    pickleRaindrops.push({ x: BX + Math.random() * BW, y: BY, speed: 1 + Math.random() * 2, size: 8 + Math.random() * 6 });
+  }
+  pickleRaindrops = pickleRaindrops.map(p => ({...p, y: p.y + p.speed})).filter(p => p.y < BY + BH);
+  if (defragFlashTimer > 0) {
+    defragFlashTimer--;
+    if (defragFlashTimer === 0) {
+      for (const r of defragFlashRows.sort((a,b) => b-a)) { board.splice(r,1); board.unshift(Array(COLS).fill(0)); }
+      defragFlashRows = [];
+      markedRows.clear();
+      for (let r = ROWS - 1; r >= 0; r--) if (board[r].every(c => c > 0)) markedRows.add(r);
+    }
+  }
+  if (defragInteractive) {
+    defragInteractiveTimer--;
+    if (defragInteractiveTimer <= 0) finishDefrag();
+    return;
+  }
+  dropTimer++;
+  const dropSpeed = Math.max(3, 30-(level-1)*3);
+  if (dropTimer >= (nPlusOneActive ? Math.max(2, Math.floor(dropSpeed/2)) : dropSpeed)) {
+    dropTimer = 0;
+    if (current && !collides(current.shape, current.x, current.y+1)) current.y++; else lockPiece();
+  }
+}
+
+// Draw helpers
+function drawCell(x: number, y: number, ci: number, a = 1) {
+  const px=BX+x*CELL, py=BY+y*CELL; ctx.globalAlpha=a;
+  ctx.fillStyle = C.pieces[(ci-1)%C.pieces.length];
+  ctx.beginPath(); ctx.roundRect(px+1,py+1,CELL-2,CELL-2,3); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fillRect(px+2,py+2,CELL-4,2); ctx.globalAlpha=1;
+}
+function drawMeter(x: number, y: number, h: number, pct: number, label: string, colors: string[]) {
+  ctx.fillStyle="#a0a0b0"; ctx.font="bold 10px monospace"; ctx.textAlign="left"; ctx.fillText(label, x, y-2);
+  ctx.fillStyle="#0a0a12"; ctx.beginPath(); ctx.roundRect(x,y+4,20,h,4); ctx.fill(); ctx.strokeStyle=C.border; ctx.lineWidth=1; ctx.stroke();
+  if (pct > 0) {
+    const fh = pct*(h-4), color = pct>0.8 ? colors[2] : pct>0.5 ? colors[1] : colors[0];
+    ctx.fillStyle=color; ctx.beginPath(); ctx.roundRect(x+2,y+h+2-fh,16,fh,3); ctx.fill();
+    if (pct > 0.8) { ctx.shadowBlur=8; ctx.shadowColor=colors[2]; ctx.fill(); ctx.shadowBlur=0; }
+  }
+}
+
+function draw() {
+  ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle="#0a0a12"; ctx.fillRect(BX,BY,BW,BH);
+  // Grid
+  ctx.strokeStyle=C.grid; ctx.lineWidth=0.5;
+  for (let i=0;i<=COLS;i++) { ctx.beginPath(); ctx.moveTo(BX+i*CELL,BY); ctx.lineTo(BX+i*CELL,BY+BH); ctx.stroke(); }
+  for (let i=0;i<=ROWS;i++) { ctx.beginPath(); ctx.moveTo(BX,BY+i*CELL); ctx.lineTo(BX+BW,BY+i*CELL); ctx.stroke(); }
+  ctx.strokeStyle=C.border; ctx.lineWidth=2; ctx.strokeRect(BX,BY,BW,BH);
+  // Placed blocks
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) if (board[r][c]) {
+    if (board[r][c] === LEAKED_BLOCK) {
+      const px=BX+c*CELL, py=BY+r*CELL;
+      ctx.fillStyle="#4b5563"; ctx.beginPath(); ctx.roundRect(px+1,py+1,CELL-2,CELL-2,3); ctx.fill();
+      ctx.fillStyle="rgba(156,163,175,0.2)"; ctx.fillRect(px+2,py+2,CELL-4,2);
+    } else {
+      const mk = markedRows.has(r);
+      drawCell(c,r,board[r][c], mk ? 0.5+Math.sin(frameCount*0.1)*0.2 : 1);
+      if (mk) { ctx.fillStyle=C.marked; ctx.fillRect(BX+c*CELL,BY+r*CELL,CELL,CELL); }
+    }
+  }
+  // Defrag flash
+  if (defragFlashTimer > 0) {
+    const flashAlpha = 0.3 + Math.sin(defragFlashTimer * 0.8) * 0.3;
+    for (const r of defragFlashRows) { ctx.fillStyle=`rgba(20,184,166,${flashAlpha})`; ctx.fillRect(BX,BY+r*CELL,BW,CELL); }
+  }
+  // Interactive defrag
+  if (defragInteractive) {
+    const flashAlpha = 0.2 + Math.sin(frameCount * 0.1) * 0.1;
+    for (const r of defragInteractiveRows) { ctx.fillStyle=`rgba(20,184,166,${flashAlpha})`; ctx.fillRect(BX,BY+r*CELL,BW,CELL); }
+    if (defragSwapFirst) {
+      const {r, c} = defragSwapFirst;
+      ctx.strokeStyle="#14b8a6"; ctx.lineWidth=2; ctx.strokeRect(BX+c*CELL+1,BY+r*CELL+1,CELL-2,CELL-2);
+    }
+    const secLeft = Math.ceil(defragInteractiveTimer / 60);
+    ctx.fillStyle="#14b8a6"; ctx.font="bold 12px monospace"; ctx.textAlign="center";
+    ctx.fillText(`SWAP BLOCKS: ${secLeft}s`, BX+BW/2, BY-8);
+    ctx.textAlign="left";
+  }
+  // Ghost piece
+  if (current && !gcActive) { const gy=ghostY();
+    for (let r=0;r<current.shape.length;r++) for (let c=0;c<current.shape[r].length;c++)
+      if (current.shape[r][c]) { ctx.fillStyle=C.ghost; ctx.beginPath(); ctx.roundRect(BX+(current.x+c)*CELL+1,BY+(gy+r)*CELL+1,CELL-2,CELL-2,3); ctx.fill(); }
+  }
+  // Current piece
+  if (current) for (let r=0;r<current.shape.length;r++) for (let c=0;c<current.shape[r].length;c++)
+    if (current.shape[r][c] && current.y+r>=0) drawCell(current.x+c,current.y+r,current.type+1);
+
+  // Side panel
+  const px = BX+BW+14;
+  // Next preview
+  ctx.fillStyle="#a0a0b0"; ctx.font="bold 10px monospace"; ctx.textAlign="left"; ctx.fillText("NEXT",px,BY+12);
+  ctx.fillStyle="#0a0a12"; ctx.beginPath(); ctx.roundRect(px,BY+18,72,56,6); ctx.fill(); ctx.strokeStyle=C.border; ctx.lineWidth=1; ctx.stroke();
+  if (cacheMissActive) {
+    ctx.fillStyle="#ef4444"; ctx.font="bold 16px monospace"; ctx.textAlign="center";
+    ctx.fillText("???", px+36, BY+50); ctx.textAlign="left";
+  } else {
+    const ns=SHAPES[nextType], pc=12, nox=px+36-(ns[0].length*pc)/2, noy=BY+46-(ns.length*pc)/2;
+    for (let r=0;r<ns.length;r++) for (let c=0;c<ns[r].length;c++) if (ns[r][c]) {
+      ctx.fillStyle=C.pieces[nextType]; ctx.beginPath(); ctx.roundRect(nox+c*pc+1,noy+r*pc+1,pc-2,pc-2,2); ctx.fill();
+    }
+  }
+  // GC + Heap meters
+  const mY=BY+108, mH=120;
+  const gcFill = Math.min(1, gcMeter/GC_THRESHOLD);
+  drawMeter(px, BY+96, mH, gcFill, "GC PRESSURE", ["#7c3aed","#f97316","#ef4444"]);
+  const heapPct = board.flat().filter(c=>c!==0).length / (COLS*ROWS);
+  drawMeter(px+28, BY+96, mH, heapPct, "HEAP", ["#14b8a6","#f97316","#ef4444"]);
+  // Cat emoji
+  ctx.font="16px serif"; ctx.textAlign="center";
+  const bob = Math.sin(frameCount*0.08)*2;
+  ctx.fillText(gcFill>0.8?"😾":gcFill>0.5?"🐱":"😺", px+10, mY+mH+20+bob);
+  // Stats
+  ctx.textAlign="left"; ctx.font="bold 10px monospace"; const sY=mY+mH+42;
+  const stats: [string,string,string][] = [["LEVEL","#f0f0f5",level+""],["SCORE","#fb923c",score+""],["LINES","#14b8a6",lines+""],["GC PAUSES","#a78bfa",gcPauses+""]];
+  stats.forEach(([lbl,clr,val],i) => { ctx.fillStyle="#a0a0b0"; ctx.fillText(lbl,px,sY+i*34); ctx.fillStyle=clr; ctx.fillText(val,px,sY+i*34+14); });
+  // Defrag indicator
+  const dY = sY + stats.length * 34 + 4;
+  if (defragCharges > 0) {
+    const pulse = 0.7 + Math.sin(frameCount * 0.1) * 0.3;
+    ctx.globalAlpha = pulse; ctx.fillStyle="#14b8a6"; ctx.beginPath(); ctx.roundRect(px, dY, 72, 22, 4); ctx.fill();
+    ctx.globalAlpha = 1; ctx.fillStyle="#050508"; ctx.font="bold 9px monospace"; ctx.textAlign="center";
+    ctx.fillText(`⚡ DEFRAG ×${defragCharges}`, px+36, dY+15); ctx.textAlign="left";
+  } else {
+    ctx.fillStyle="rgba(160,160,176,0.12)"; ctx.beginPath(); ctx.roundRect(px, dY, 72, 22, 4); ctx.fill();
+    ctx.fillStyle="rgba(160,160,176,0.3)"; ctx.font="bold 9px monospace"; ctx.textAlign="center";
+    ctx.fillText("DEFRAG", px+36, dY+15); ctx.textAlign="left";
+  }
+
+  // GC freeze overlay
+  if (gcActive) {
+    ctx.fillStyle=C.gcOverlay; ctx.fillRect(BX,BY,BW,BH);
+    const ia = 0.3+Math.sin(frameCount*0.15)*0.15;
+    ctx.strokeStyle=`rgba(167,139,250,${ia})`; ctx.lineWidth=3; ctx.strokeRect(BX+2,BY+2,BW-4,BH-4);
+    // Sweeping cat with Z's
+    ctx.font="20px serif"; ctx.textAlign="center";
+    const sb=Math.sin(catPhase)*4, cx=BX+Math.min(catX,BW+10);
+    ctx.fillText("😹",cx,BY+BH-20+sb);
+    for (let i=0;i<3;i++) { const za=(catPhase+i*1.2)%3; ctx.globalAlpha=Math.max(0,1-za/3); ctx.font=`${10+i*2}px monospace`; ctx.fillStyle=C.gcText; ctx.fillText("z",cx+14+i*6,BY+BH-30-za*20+sb); }
+    ctx.globalAlpha=1;
+    // Pause counter
+    const rem = Math.max(0,(gcFreezeEnd-frameCount)*16.67);
+    ctx.fillStyle=C.gcText; ctx.textAlign="center"; ctx.shadowBlur=10; ctx.shadowColor="#7c3aed";
+    ctx.font="bold 16px monospace"; ctx.fillText("⏸ GC PAUSE",BX+BW/2,BY+BH/2-10);
+    ctx.font="bold 22px monospace"; ctx.fillText(`${Math.ceil(rem)}ms`,BX+BW/2,BY+BH/2+18);
+    ctx.shadowBlur=0;
+    for (const r of markedRows) { ctx.fillStyle=`rgba(167,139,250,${0.15+Math.sin(frameCount*0.2)*0.1})`; ctx.fillRect(BX,BY+r*CELL,BW,CELL); }
+  }
+  // Performance event warnings
+  if (nPlusOneWarnEnd > 0 && frameCount < nPlusOneWarnEnd) {
+    const flash = Math.sin(frameCount * 0.3) > 0 ? 1 : 0.3;
+    ctx.globalAlpha = flash; ctx.fillStyle="#f59e0b"; ctx.font="bold 13px monospace"; ctx.textAlign="center";
+    ctx.fillText("⚠ N+1 STORM INCOMING", BX+BW/2, BY+16); ctx.globalAlpha=1; ctx.textAlign="left";
+  }
+  if (nPlusOneActive) {
+    const flash = 0.08 + Math.sin(frameCount * 0.2) * 0.04;
+    ctx.fillStyle=`rgba(245,158,11,${flash})`; ctx.fillRect(BX,BY,BW,BH);
+    ctx.fillStyle="#f59e0b"; ctx.font="bold 12px monospace"; ctx.textAlign="center";
+    ctx.fillText("⚡ N+1 STORM ⚡", BX+BW/2, BY+16); ctx.textAlign="left";
+    // Pickle rain
+    ctx.font="10px serif";
+    for (const pr of pickleRaindrops) { ctx.globalAlpha = 0.4; ctx.fillText("🥒", pr.x, pr.y); }
+    ctx.globalAlpha = 1;
+  }
+  if (memLeakWarnEnd > 0 && frameCount < memLeakWarnEnd) {
+    const flash = Math.sin(frameCount * 0.3) > 0 ? 1 : 0.3;
+    ctx.globalAlpha = flash; ctx.fillStyle="#6b7280"; ctx.font="bold 13px monospace"; ctx.textAlign="center";
+    ctx.fillText("⚠ MEMORY LEAK DETECTED", BX+BW/2, BY+16); ctx.globalAlpha=1; ctx.textAlign="left";
+  }
+  if (memLeakActive) {
+    ctx.fillStyle="#6b7280"; ctx.font="bold 11px monospace"; ctx.textAlign="center";
+    ctx.fillText("💧 MEMORY LEAK", BX+BW/2, BY+16); ctx.textAlign="left";
+    const colFlash = 0.05 + Math.sin(frameCount * 0.1) * 0.03;
+    ctx.fillStyle=`rgba(107,114,128,${colFlash})`; ctx.fillRect(BX+memLeakCol*CELL, BY, CELL, BH);
+  }
+  if (cacheMissWarnEnd > 0 && frameCount < cacheMissWarnEnd) {
+    const flash = Math.sin(frameCount * 0.3) > 0 ? 1 : 0.3;
+    ctx.globalAlpha = flash; ctx.fillStyle="#ef4444"; ctx.font="bold 13px monospace"; ctx.textAlign="center";
+    ctx.fillText("⚠ CACHE MISS INCOMING", BX+BW/2, BY+16); ctx.globalAlpha=1; ctx.textAlign="left";
+  }
+  if (cacheMissActive) {
+    ctx.fillStyle="#ef4444"; ctx.font="bold 11px monospace"; ctx.textAlign="center";
+    ctx.fillText("❌ CACHE MISS", BX+BW/2, BY+16); ctx.textAlign="left";
+  }
+  // Pickle column flash
+  if (pickleColFlash >= 0) {
+    const pa = 0.3 + Math.sin(frameCount * 0.5) * 0.2;
+    ctx.fillStyle = `rgba(74,222,128,${pa})`; ctx.fillRect(BX + pickleColFlash * CELL, BY, CELL, BH);
+  }
+  // Pickle power-up icon
+  if (pickleActive) {
+    const bob = Math.sin(frameCount * 0.12) * 4;
+    const pulse = 0.7 + Math.sin(frameCount * 0.15) * 0.3;
+    ctx.globalAlpha = pulse; ctx.font = "24px serif"; ctx.textAlign = "center";
+    ctx.fillText("🥒", BX + BW / 2, BY + 20 + bob);
+    ctx.font = "bold 10px monospace"; ctx.fillStyle = "#4ade80";
+    const secLeft = Math.max(0, Math.ceil((pickleEnd - frameCount) / 60));
+    ctx.fillText(`Press P! ${secLeft}s`, BX + BW / 2, BY + 38 + bob);
+    ctx.globalAlpha = 1; ctx.textAlign = "left";
+  }
+  // Flying pickle emojis
+  for (const pe of pickleEmojis) { ctx.globalAlpha = pe.life / 60; ctx.font = "14px serif"; ctx.fillText("🥒", pe.x - 7, pe.y); }
+  ctx.globalAlpha = 1;
+  // Popups
+  for (const p of popups) { ctx.globalAlpha=Math.min(1,p.life/60); ctx.font="bold 13px monospace"; ctx.fillStyle=p.color; ctx.textAlign="center"; ctx.fillText(p.text,p.x,p.y-(60-p.life)*0.8); ctx.globalAlpha=1; }
+  // HUD
+  $("hud-score").textContent=score+""; $("hud-lines").textContent=lines+""; $("hud-level").textContent=level+""; $("hud-best").textContent=best+"";
+  const defragEl = $("hud-defrag"), defragCntEl = $("hud-defrag-count");
+  if (defragCharges > 0) { defragEl.classList.remove("hidden"); defragCntEl.textContent = defragCharges+""; } else { defragEl.classList.add("hidden"); }
+}
+
+function gameLoop() {
+  if (!running) return;
+  frameCount++; update(); draw();
+  popups = popups.map(p => ({...p, life: p.life-1})).filter(p => p.life > 0);
+  requestAnimationFrame(gameLoop);
+}
+$("hud-best").textContent = best+"";
+</script>

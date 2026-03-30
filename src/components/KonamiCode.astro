@@ -1,0 +1,65 @@
+<!-- Konami code easter egg: ↑↑↓↓←→←→BA reveals Mona.png -->
+<div
+  id="mona-overlay"
+  class="fixed inset-0 z-[200] bg-surface-900/95 flex items-center justify-center hidden"
+>
+  <div class="text-center space-y-6">
+    <img
+      src="/images/mona.png"
+      alt="Elena as Mona the Octocat"
+      class="w-64 h-64 rounded-full mx-auto object-cover"
+      style="box-shadow: 0 0 40px #fb923c, 0 0 80px #f97316;"
+    />
+    <p class="text-flame-400 font-mono text-lg">🎮 Achievement unlocked!</p>
+    <p class="text-text-secondary text-sm">You found the secret Mona mode</p>
+    <button
+      id="mona-close"
+      class="text-text-muted hover:text-flame-400 text-sm font-mono mt-4 cursor-pointer"
+    >
+      [press any key or click to close]
+    </button>
+  </div>
+</div>
+
+<script>
+  const sequence = [
+    "ArrowUp",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "ArrowLeft",
+    "ArrowRight",
+    "b",
+    "a",
+  ];
+  let position = 0;
+
+  const overlay = document.getElementById("mona-overlay");
+  const closeBtn = document.getElementById("mona-close");
+
+  function hideOverlay() {
+    overlay?.classList.add("hidden");
+    position = 0;
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (!overlay?.classList.contains("hidden")) {
+      hideOverlay();
+      return;
+    }
+
+    if (e.key === sequence[position]) {
+      position++;
+      if (position === sequence.length) {
+        overlay?.classList.remove("hidden");
+      }
+    } else {
+      position = 0;
+    }
+  });
+
+  closeBtn?.addEventListener("click", hideOverlay);
+  overlay?.addEventListener("click", hideOverlay);
+</script>

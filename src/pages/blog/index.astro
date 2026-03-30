@@ -1,0 +1,54 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Nav from "../../components/Nav.astro";
+import PostCard from "../../components/PostCard.astro";
+import Footer from "../../components/Footer.astro";
+import { getCollection } from "astro:content";
+
+const isDev = import.meta.env.DEV;
+
+const posts = (await getCollection("blog"))
+  .filter((post) => isDev || !post.data.draft)
+  .sort(
+    (a, b) =>
+      new Date(b.data.date).getTime() - new Date(a.data.date).getTime()
+  );
+---
+
+<Layout title="Blog — Elena Tănăsoiu" description="Technical writing about performance engineering, flamegraphs, Ruby, and Rails.">
+  <Nav />
+
+  <main class="flex-1 pt-28 pb-16">
+    <div class="max-w-5xl mx-auto px-6">
+      <h1 class="text-3xl md:text-4xl font-bold mb-4">Blog</h1>
+      <p class="text-text-secondary mb-12 max-w-lg">
+        Writing about performance engineering, profiling, and the things I learn
+        along the way.
+      </p>
+
+      <div class="grid md:grid-cols-2 gap-6">
+        {
+          posts.map((post) => (
+            <PostCard
+              title={post.data.title}
+              date={post.data.date}
+              description={post.data.description}
+              slug={post.id}
+              basePath="/blog"
+            />
+          ))
+        }
+      </div>
+
+      {
+        posts.length === 0 && (
+          <p class="text-text-muted text-center py-12">
+            Posts coming soon. Check back after my conference talks!
+          </p>
+        )
+      }
+    </div>
+  </main>
+
+  <Footer />
+</Layout>

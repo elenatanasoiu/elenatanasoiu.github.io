@@ -1,0 +1,122 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Nav from "../../components/Nav.astro";
+import Footer from "../../components/Footer.astro";
+---
+
+<Layout ogImage="/images/og-review.png" title="" ogImage="/images/og-review.png" description="Your engineering performance across all games.">
+  <Nav />
+
+  <main class="flex-1 pt-28 pb-16">
+    <div class="max-w-3xl mx-auto px-6">
+      <h1 class="text-3xl md:text-4xl font-bold mb-2">🏆 Performance Review</h1>
+      <p class="text-text-secondary mb-10">Your engineering performance across all games</p>
+
+      <div id="report" class="space-y-4 mb-10"></div>
+
+      <div id="overall" class="bg-surface-800 border border-surface-600 rounded-xl p-6 text-center mb-8 hidden">
+        <p class="text-text-secondary text-sm font-mono mb-1">Overall Engineering Level</p>
+        <p id="overall-score" class="text-2xl font-bold mb-1"></p>
+        <p id="overall-label" class="text-lg font-semibold"></p>
+      </div>
+
+      <div class="text-center">
+        <button
+          id="share-btn"
+          class="inline-flex items-center gap-2 bg-flame-500 hover:bg-flame-600 text-white font-semibold px-6 py-3 rounded-lg transition-colors font-mono text-sm"
+        >
+          📋 Copy Performance Review
+        </button>
+        <p id="share-feedback" class="text-text-muted text-xs mt-2 hidden">Copied to clipboard!</p>
+      </div>
+
+      <div class="text-center mt-8">
+        <a href="/games" class="text-flame-400 hover:text-flame-300 text-sm font-mono transition-colors">← Back to Games</a>
+      </div>
+    </div>
+  </main>
+
+  <Footer />
+</Layout>
+
+<script>
+  const games = [
+    { name: "Flamegraph Runner", emoji: "🐈‍⬛", key: "flamegraph-runner-best" },
+    { name: "N+1 Swatter",      emoji: "🧹",    key: "n1-swatter-best" },
+    { name: "Cache Cat",         emoji: "🐈‍⬛", key: "cache-cat-best" },
+    { name: "Stack Diver",       emoji: "🔥",    key: "stackDiverBest" },
+    { name: "Pickle Panic",      emoji: "🥒",    key: "pickle-panic-best" },
+  ];
+
+  function getRating(score: number) {
+    if (score === 0)   return { label: "Not attempted", color: "text-text-muted",  border: "border-surface-600",    glow: "" };
+    if (score < 50)    return { label: "Junior",        color: "text-teal-400",    border: "border-teal-500/40",    glow: "" };
+    if (score < 150)   return { label: "Mid-level",     color: "text-yellow-400",  border: "border-yellow-500/40",  glow: "" };
+    if (score < 300)   return { label: "Senior",        color: "text-orange-400",  border: "border-orange-500/40",  glow: "" };
+    return             { label: "Staff",          color: "text-red-400",     border: "border-red-500/50",     glow: "shadow-[0_0_20px_rgba(239,68,68,0.3)]" };
+  }
+
+  const report = document.getElementById("report")!;
+  const overallEl = document.getElementById("overall")!;
+  const overallScore = document.getElementById("overall-score")!;
+  const overallLabel = document.getElementById("overall-label")!;
+
+  let totalScore = 0;
+
+  games.forEach((game) => {
+    const score = parseInt(localStorage.getItem(game.key) || "0");
+    totalScore += score;
+    const rating = getRating(score);
+
+    const card = document.createElement("div");
+    card.className = `bg-surface-800 border ${rating.border} rounded-xl p-5 flex items-center gap-4 ${rating.glow}`;
+    card.innerHTML = `
+      <span class="text-3xl">${game.emoji}</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-text-primary font-semibold">${game.name}</p>
+        <p class="text-text-muted text-xs font-mono">${score === 0 ? "—" : score + " pts"}</p>
+      </div>
+      <span class="${rating.color} font-mono text-sm font-semibold">${rating.label}</span>
+    `;
+    report.appendChild(card);
+  });
+
+  const overallRating = getRating(totalScore);
+  overallScore.textContent = `${totalScore} pts`;
+  overallLabel.className = `text-lg font-semibold ${overallRating.color}`;
+  overallLabel.textContent = overallRating.label === "Staff" ? "Staff Engineer 🔥" : overallRating.label + " Engineer";
+  if (overallRating.glow) overallEl.classList.add(...overallRating.glow.split(" "));
+  overallEl.classList.remove("hidden");
+
+  const shareBtn = document.getElementById("share-btn")!;
+  const feedback = document.getElementById("share-feedback")!;
+
+  shareBtn.addEventListener("click", async () => {
+    const lines = ["🏆 My Performance Review @ elenatanasoiu.com/games"];
+    games.forEach((game) => {
+      const score = parseInt(localStorage.getItem(game.key) || "0");
+      const rating = getRating(score);
+      lines.push(`${game.emoji} ${game.name}: ${score === 0 ? "—" : score + "pts"} (${rating.label})`);
+    });
+    const overall = getRating(totalScore);
+    lines.push(`Overall: ${overall.label === "Staff" ? "Staff Engineer 🔥" : overall.label + " Engineer"}`);
+
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      feedback.classList.remove("hidden");
+      setTimeout(() => feedback.classList.add("hidden"), 2000);
+    } catch {
+      // Fallback for older browsers
+      const ta = document.createElement("textarea");
+      ta.value = lines.join("\n");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      feedback.classList.remove("hidden");
+      setTimeout(() => feedback.classList.add("hidden"), 2000);
+    }
+  });
+</script>
