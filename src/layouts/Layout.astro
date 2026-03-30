@@ -1,0 +1,117 @@
+---
+import "../styles/global.css";
+import Embers from "../components/Embers.astro";
+import KonamiCode from "../components/KonamiCode.astro";
+import PerfWidget from "../components/PerfWidget.astro";
+import EasterEggs from "../components/EasterEggs.astro";
+import BlackCat from "../components/BlackCat.astro";
+
+interface Props {
+  title?: string;
+  description?: string;
+  ogImage?: string;
+}
+
+const {
+  title = "Elena Tănăsoiu — Staff Engineer, Performance Engineering",
+  description = "Staff Engineer at GitHub making one of the world's largest Ruby on Rails applications faster. Speaker, writer, flamegraph enthusiast.",
+  ogImage = "/images/profile.jpg",
+} = Astro.props;
+
+const canonicalURL = new URL(Astro.url.pathname, "https://elenatanasoiu.com");
+---
+
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- SEO -->
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalURL} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={new URL(ogImage, "https://elenatanasoiu.com")} />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={new URL(ogImage, "https://elenatanasoiu.com")} />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Google Analytics (production only) -->
+    <script
+      is:inline
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=G-7XFFYZEJ8V"></script>
+    <script is:inline>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+      gtag("config", "G-7XFFYZEJ8V");
+    </script>
+  </head>
+  <body
+    class="bg-surface-900 text-text-primary min-h-screen flex flex-col antialiased"
+  >
+    <Embers />
+    <KonamiCode />
+    <PerfWidget />
+    <EasterEggs />
+    <BlackCat />
+    <slot />
+
+    <!-- Section reveal observer -->
+    <script>
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("visible");
+            }
+          });
+        },
+        { threshold: 0.1 }
+      );
+      document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
+    </script>
+
+    <!-- Flame emoji cursor -->
+    <script>
+      (function() {
+        const canvas = document.createElement("canvas");
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.font = "28px serif";
+          ctx.textBaseline = "top";
+          ctx.fillText("🔥", 2, 2);
+          const url = canvas.toDataURL("image/png");
+          document.documentElement.style.cursor = `url(${url}) 16 2, auto`;
+        }
+      })();
+    </script>
+  </body>
+</html>

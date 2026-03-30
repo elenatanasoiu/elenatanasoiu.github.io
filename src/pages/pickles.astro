@@ -1,0 +1,93 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<Layout title="🥒 Pickles — Elena Tănăsoiu" description="An authoritative ranking of pickles.">
+  <Nav />
+
+  <main class="flex-1 pt-28 pb-16">
+    <div class="max-w-3xl mx-auto px-6">
+      <h1 class="text-3xl md:text-4xl font-bold mb-2">🥒 The Definitive Pickle Ranking</h1>
+      <p class="text-text-secondary mb-8">
+        You found the secret page. As a performance engineer who
+        <em>"enjoys pickles and flamegraphs"</em>, I feel it's my duty to rank them.
+      </p>
+
+      <div class="space-y-6">
+        <div class="bg-surface-800 border border-surface-600 rounded-xl p-6">
+          <div class="flex items-center gap-4">
+            <span class="text-3xl">🥇</span>
+            <div>
+              <h2 class="text-text-primary font-semibold text-lg">Cornichons</h2>
+              <p class="text-text-secondary text-sm">The tiny, crunchy, French ones. Peak pickle performance. O(1) crunch time.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-surface-800 border border-surface-600 rounded-xl p-6">
+          <div class="flex items-center gap-4">
+            <span class="text-3xl">🥈</span>
+            <div>
+              <h2 class="text-text-primary font-semibold text-lg">Half-sour Dill</h2>
+              <p class="text-text-secondary text-sm">Still has some crunch left. Like code that's been partially optimised — room to grow.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-surface-800 border border-surface-600 rounded-xl p-6">
+          <div class="flex items-center gap-4">
+            <span class="text-3xl">🥉</span>
+            <div>
+              <h2 class="text-text-primary font-semibold text-lg">Bread & Butter</h2>
+              <p class="text-text-secondary text-sm">Sweet and tangy. The comfort food of pickles. Reliable like a well-tested codebase.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-surface-800 border border-surface-600 rounded-xl p-6">
+          <div class="flex items-center gap-4">
+            <span class="text-2xl">4.</span>
+            <div>
+              <h2 class="text-text-primary font-semibold text-lg">Classic Dill</h2>
+              <p class="text-text-secondary text-sm">The default. Like Ruby on Rails — gets the job done, everyone has an opinion.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-surface-800 border border-surface-600 rounded-xl p-6">
+          <div class="flex items-center gap-4">
+            <span class="text-2xl">5.</span>
+            <div>
+              <h2 class="text-text-primary font-semibold text-lg">Pickled Onions</h2>
+              <p class="text-text-secondary text-sm">Not technically a pickle but I'll allow it. Like Go in a Ruby shop — unexpected but effective.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-surface-800 border border-surface-600 rounded-xl p-6 opacity-60">
+          <div class="flex items-center gap-4">
+            <span class="text-2xl">∞</span>
+            <div>
+              <h2 class="text-text-primary font-semibold text-lg">Sweet Gherkins</h2>
+              <p class="text-text-secondary text-sm">Too sweet. Like over-engineering. Sometimes less is more.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="text-text-muted text-xs mt-12 text-center font-mono">
+        This ranking is final and not up for debate. Any PRs will be closed without comment.
+      </p>
+
+      <div class="mt-8 text-center">
+        <a href="/" class="text-flame-400 hover:text-flame-300 text-sm font-medium">
+          ← Back to serious engineering content
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <Footer />
+</Layout>

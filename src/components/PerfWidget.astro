@@ -1,0 +1,51 @@
+<!-- Shows how fast the page loaded, displayed as a "temperature" -->
+<div
+  id="perf-widget"
+  class="fixed bottom-4 right-4 z-50 bg-surface-800 border border-surface-600 rounded-lg px-3 py-2 text-xs font-mono"
+  style="opacity: 0; transition: opacity 0.5s ease;"
+>
+  <span class="text-text-muted">page temp: </span>
+  <span id="perf-value" class="text-flame-400">measuring...</span>
+</div>
+
+<script>
+  window.addEventListener("load", () => {
+    setTimeout(() => {
+      const entries = performance.getEntriesByType("navigation");
+      if (!entries.length) return;
+      const nav = entries[0] as PerformanceNavigationTiming;
+      const loadTime = Math.round(nav.loadEventEnd - nav.startTime);
+
+      // Dev server can report 0 or negative — use performance.now() as fallback
+      const time = loadTime > 0 ? loadTime : Math.round(performance.now());
+
+      let emoji = "🧊";
+      let label = "frozen";
+      if (time > 3000) {
+        emoji = "🔥🔥🔥";
+        label = "on fire";
+      } else if (time > 1500) {
+        emoji = "🔥🔥";
+        label = "toasty";
+      } else if (time > 800) {
+        emoji = "🔥";
+        label = "warm";
+      } else if (time > 400) {
+        emoji = "☀️";
+        label = "cool";
+      }
+
+      const widget = document.getElementById("perf-widget");
+      const value = document.getElementById("perf-value");
+      if (value) {
+        value.textContent = `${time}ms ${emoji} ${label}`;
+      }
+      if (widget) {
+        widget.style.opacity = "1";
+        setTimeout(() => {
+          widget.style.opacity = "0";
+        }, 8000);
+      }
+    }, 500);
+  });
+</script>

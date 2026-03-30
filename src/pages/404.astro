@@ -1,0 +1,31 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<Layout title="404 — Elena Tănăsoiu" description="Page not found.">
+  <Nav />
+
+  <main class="flex-1 flex items-center justify-center pt-20">
+    <div class="text-center space-y-6 px-6">
+      <p class="text-flame-400 font-mono text-8xl font-bold" style="text-shadow: 0 0 20px #fb923c40;">
+        404
+      </p>
+      <h1 class="text-2xl font-bold text-text-primary">
+        This page returned in 0ms
+      </h1>
+      <p class="text-text-secondary">
+        Because it doesn't exist. The fastest code is the code that never runs.
+      </p>
+      <a
+        href="/"
+        class="inline-block mt-4 text-flame-400 hover:text-flame-300 font-mono text-sm"
+      >
+        ← Back to the flamegraph
+      </a>
+    </div>
+  </main>
+
+  <Footer />
+</Layout>

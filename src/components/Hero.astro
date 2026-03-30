@@ -1,0 +1,94 @@
+---
+import SocialIcons from "./SocialIcons.astro";
+---
+
+<section class="min-h-[85vh] flex items-center pt-20">
+  <div class="max-w-5xl mx-auto px-6 w-full">
+    <div class="grid md:grid-cols-5 gap-12 items-center">
+      <!-- Text -->
+      <div class="md:col-span-3 space-y-6">
+        <div class="space-y-2">
+          <p class="text-flame-400 font-mono text-sm tracking-wide">
+            Staff Engineer · Performance Engineering
+          </p>
+          <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
+            Elena
+            <span class="text-flame-400">Tănăsoiu</span>
+          </h1>
+        </div>
+
+        <p class="text-text-secondary text-lg md:text-xl max-w-xl leading-relaxed">
+          Making one of the world's largest Ruby on Rails applications faster at
+          <span class="text-teal-400">GitHub</span>. Profiling production
+          traffic, diagnosing bottlenecks, and occasionally convincing teams they
+          don't need more hardware.
+        </p>
+
+        <p id="hero-tagline" class="text-text-muted text-base italic">
+          <span class="sr-only">She has a fondness for flamegraphs because they remove the guesswork.</span>
+        </p>
+
+        <SocialIcons />
+      </div>
+
+      <!-- Photo -->
+      <div class="md:col-span-2 flex justify-center md:justify-end">
+        <div class="relative">
+          <div
+            class="absolute -inset-1 bg-gradient-to-br from-flame-500 via-neon-pink to-teal-400 rounded-2xl blur-md opacity-70 animate-pulse"
+            style="animation-duration: 3s;"
+          >
+          </div>
+          <img
+            src="/images/profile.jpg"
+            alt="Elena Tănăsoiu"
+            class="relative rounded-2xl w-64 md:w-72 lg:w-80 object-cover object-center aspect-square"
+            loading="eager"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Scroll indicator -->
+    <div class="flex justify-center mt-16 animate-bounce">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-6 w-6 text-text-muted"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<script>
+  const tagline = "She has a fondness for flamegraphs because they remove the guesswork.";
+  const el = document.getElementById("hero-tagline");
+  if (el) {
+    let i = 0;
+    const span = document.createElement("span");
+    span.setAttribute("aria-hidden", "true");
+    el.appendChild(span);
+    function type() {
+      if (i < tagline.length) {
+        span.textContent += tagline[i];
+        i++;
+        setTimeout(type, 40 + Math.random() * 30);
+      } else {
+        // Add blinking cursor then remove it
+        span.textContent += "▍";
+        setTimeout(() => {
+          span.textContent = span.textContent!.slice(0, -1);
+        }, 2000);
+      }
+    }
+    setTimeout(type, 800);
+  }
+</script>

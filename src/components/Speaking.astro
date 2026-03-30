@@ -1,0 +1,115 @@
+---
+import { talks, type Talk } from "../data/talks";
+
+const upcomingTalks = talks.filter((t) => t.upcoming);
+const pastTalks = talks.filter((t) => !t.upcoming);
+---
+
+<section id="speaking" class="py-24 reveal">
+  <div class="max-w-5xl mx-auto px-6">
+    <h2 class="text-2xl font-bold mb-2">
+      <span class="text-flame-400 font-mono text-sm block mb-1">02.</span>
+      Speaking
+    </h2>
+
+    <div
+      class="h-px bg-gradient-to-r from-flame-500/50 to-transparent mb-8 max-w-xs"
+    >
+    </div>
+
+    <!-- Upcoming -->
+    {
+      upcomingTalks.length > 0 && (
+        <div class="mb-12">
+          <h3 class="text-teal-400 font-mono text-sm uppercase tracking-wider mb-6">
+            Upcoming
+          </h3>
+          <div class="grid gap-6">
+            {upcomingTalks.map((talk) => (
+              <div class="group bg-surface-800 border border-surface-600 rounded-xl p-6 hover:border-flame-500/50 transition-all">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                  <div class="space-y-2">
+                    <div class="flex items-center gap-3">
+                      <span
+                        class={`text-xs font-mono px-2 py-0.5 rounded-full ${
+                          talk.type === "workshop"
+                            ? "bg-purple-500/20 text-purple-400"
+                            : "bg-flame-500/20 text-flame-400"
+                        }`}
+                      >
+                        {talk.type}
+                      </span>
+                      <span class="text-text-muted text-sm">{talk.date}</span>
+                    </div>
+                    <h4 class="text-text-primary font-semibold text-lg">
+                      {talk.title}
+                    </h4>
+                    <p class="text-flame-400 font-medium">{talk.event}</p>
+                    <p class="text-text-secondary text-sm max-w-lg">
+                      {talk.description}
+                    </p>
+                    {talk.coSpeaker && (
+                      <p class="text-text-muted text-sm">
+                        Co-presented with {talk.coSpeaker}
+                      </p>
+                    )}
+                  </div>
+                  <span class="text-text-muted text-sm">{talk.location}</span>
+                </div>
+                {talk.url && (
+                  <a
+                    href={talk.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-block mt-4 text-sm text-flame-400 hover:text-flame-300 font-medium"
+                  >
+                    Event details →
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    <!-- Past -->
+    <div>
+      <h3
+        class="text-text-muted font-mono text-sm uppercase tracking-wider mb-6"
+      >
+        Past
+      </h3>
+      <div class="grid gap-4">
+        {
+          pastTalks.map((talk) => (
+            <div class="flex flex-wrap items-center justify-between gap-4 py-3 border-b border-surface-700">
+              <div>
+                <h4 class="text-text-primary font-medium">{talk.title}</h4>
+                <p class="text-text-muted text-sm">
+                  {talk.event} · {talk.date}
+                </p>
+                {talk.description && (
+                  <p class="text-text-secondary text-sm mt-1">{talk.description}</p>
+                )}
+              </div>
+              <div class="flex items-center gap-4">
+                <span class="text-text-muted text-sm">{talk.location}</span>
+                {talk.videoUrl && (
+                  <a
+                    href={talk.videoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-teal-400 hover:text-teal-300 text-sm font-medium"
+                  >
+                    Watch →
+                  </a>
+                )}
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</section>

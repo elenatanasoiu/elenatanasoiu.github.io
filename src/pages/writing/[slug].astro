@@ -1,0 +1,58 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Nav from "../../components/Nav.astro";
+import Footer from "../../components/Footer.astro";
+import { getCollection, render } from "astro:content";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("creative-writing");
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+
+const formattedDate = new Date(post.data.date).toLocaleDateString("en-GB", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+---
+
+<Layout
+  title={`${post.data.title} — Elena Tănăsoiu`}
+  description={post.data.description}
+>
+  <Nav />
+
+  <main class="flex-1 pt-28 pb-16">
+    <article class="max-w-3xl mx-auto px-6">
+      <header class="mb-12">
+        <a
+          href="/writing"
+          class="text-flame-400 hover:text-flame-300 text-sm font-medium mb-6 inline-block"
+        >
+          ← Back to writing
+        </a>
+        <p class="text-text-muted font-mono text-sm mb-3">{formattedDate}</p>
+        <h1 class="text-3xl md:text-4xl font-bold leading-tight mb-4">
+          {post.data.title}
+        </h1>
+        <p class="text-text-secondary text-lg">{post.data.description}</p>
+        <div
+          class="h-px bg-gradient-to-r from-flame-500/50 to-transparent mt-8"
+        >
+        </div>
+      </header>
+
+      <div class="prose">
+        <Content />
+      </div>
+    </article>
+  </main>
+
+  <Footer />
+</Layout>
