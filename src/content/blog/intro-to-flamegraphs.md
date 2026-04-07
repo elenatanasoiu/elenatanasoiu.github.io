@@ -70,7 +70,7 @@ Vernier.profile(out: "profile.json") do
 end
 ```
 
-Open the resulting JSON in [vernier.prof](https://vernier.prof/), [Firefox Profiler](https://profiler.firefox.com/), or if you're feeling adventurous, [my own viewer](https://elenatanasoiu.com/performance-viewer/).
+Open the resulting JSON in [vernier.prof](https://vernier.prof/), [Firefox Profiler](https://profiler.firefox.com/), or if you're feeling adventurous, [my own viewer](https://elenatanasoiu.com/flamegraph-viewer/).
 
 Beyond basic CPU samples, Vernier captures additional context as markers: GC events (when garbage collection ran and for how long), SQL queries (the actual SQL, with timing), and feature flag evaluations. These show up on a timeline alongside the flamegraph, so you can correlate CPU spikes with specific events. For example, you might notice that a particular SQL query triggers an expensive code path, or that a feature flag check involves a database lookup you didn't expect.
 
