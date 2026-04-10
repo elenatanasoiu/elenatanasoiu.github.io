@@ -87,6 +87,7 @@ import Footer from "../../components/Footer.astro";
 
   // Game state
   let running = false;
+  let animFrameId = 0;
   let score = 0;
   let best = parseInt(localStorage.getItem("flamegraph-runner-best") || "0");
   let speed = 3;
@@ -662,7 +663,7 @@ import Footer from "../../components/Footer.astro";
     if (!running) return;
     update();
     draw();
-    requestAnimationFrame(gameLoop);
+    animFrameId = requestAnimationFrame(gameLoop);
   }
 
   function jump() {
@@ -682,6 +683,7 @@ import Footer from "../../components/Footer.astro";
   }
 
   function startGame() {
+    cancelAnimationFrame(animFrameId);
     score = 0;
     frameCount = 0;
     speed = 3;
