@@ -14,10 +14,10 @@ import Footer from "../../components/Footer.astro";
         <div id="start-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-900/90 rounded-xl">
           <div class="text-5xl mb-4">🥒</div>
           <h2 class="text-text-primary font-bold text-xl mb-2">Pickle Panic</h2>
-          <p class="text-text-secondary text-xs mb-1 max-w-[250px]">Stack code blocks before the GC cat freezes everything.</p>
-          <p class="text-flame-400 text-xs mb-4 max-w-[250px]">Collect pickles for bonuses!</p>
+          <p class="text-text-secondary text-xs mb-1 max-w-[250px]">Your pickled objects are piling up! Clear rows before the GC cat freezes everything.</p>
           <button id="start-btn" class="bg-flame-500 hover:bg-flame-600 text-surface-900 font-bold py-2 px-8 rounded-xl text-sm transition-colors cursor-pointer">START</button>
-          <p class="text-text-muted text-xs mt-4 font-mono">↑ rotate · ←→ move · ↓ soft drop · space hard drop · D defrag · P pickle</p>
+          <p class="text-text-muted text-xs mt-4 font-mono">↑ rotate · ←→ move · ↓ soft drop · space hard drop</p>
+          <p class="text-text-muted text-xs font-mono">D defrag (swap blocks to complete rows)</p>
           <p class="text-text-muted text-xs font-mono">mobile: swipe ←→↓ · tap to rotate</p>
         </div>
         <div id="game-over" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-900/90 rounded-xl hidden">
@@ -78,20 +78,12 @@ let gcMeter = 0, gcFreezeEnd = 0, gcActive = false;
 let catX = -40, catPhase = 0, popups: Popup[] = [];
 let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
 const GC_THRESHOLD = 100;
+let animFrameId = 0;
 let defragCharges = 0, defragLineCounter = 0, defragUsed = 0;
 let defragFlashTimer = 0, defragFlashRows: number[] = [];
 let defragInteractive = false, defragSwapFirst: {r: number, c: number} | null = null;
 let defragInteractiveTimer = 0, defragInteractiveRows: number[] = [];
-
-// Pickle power-up state
-let pickleLineCounter = 0, pickleActive = false, pickleEnd = 0;
-let pickleColFlash = -1, pickleColFlashEnd = 0;
-interface PickleEmoji { x: number; y: number; vy: number; life: number }
-let pickleEmojis: PickleEmoji[] = [];
-
-// Pickle rain (decorative during N+1 storm)
-interface PickleRain { x: number; y: number; speed: number; size: number }
-let pickleRaindrops: PickleRain[] = [];
+let firstDefragEarned = false;
 
 const PICKLE_PUNS = [
   "You're in a real pickle now!",
@@ -128,7 +120,6 @@ function sndDefrag() { playTone(200, 0.4, 800, "square"); }
 function sndNPlusOne() { playTone(150, 0.15, 300, "sawtooth"); }
 function sndMemLeak() { playTone(100, 0.3, 60, "sine"); }
 function sndCacheMiss() { playTone(500, 0.1, 200, "square"); }
-function sndPickle() { playTone(600, 0.15, 900, "sine"); }
 
 function resetBoard() { board = Array.from({length: ROWS}, () => Array(COLS).fill(0)); }
 function newPiece(t: number): Piece {
@@ -165,33 +156,23 @@ function checkLines() {
     gcMeter += cleared * (cleared >= 4 ? 30 : cleared >= 3 ? 20 : 12);
     sndSweep();
     defragLineCounter += cleared;
-    while (defragLineCounter >= 10) { defragLineCounter -= 10; defragCharges++; popups.push({ x: BX+BW/2, y: BY+BH/2-30, text: "DEFRAG READY!", life: 60, color: "#14b8a6" }); }
+    while (defragLineCounter >= 10) {
+      defragLineCounter -= 10; defragCharges++;
+      if (!firstDefragEarned) {
+        firstDefragEarned = true;
+        popups.push({ x: BX+BW/2, y: BY+BH/2-60, text: "Press D to defrag!", life: 120, color: "#14b8a6" });
+        popups.push({ x: BX+BW/2, y: BY+BH/2-30, text: "Swap blocks to complete rows", life: 120, color: "#14b8a6" });
+      } else {
+        popups.push({ x: BX+BW/2, y: BY+BH/2-30, text: "DEFRAG READY!", life: 60, color: "#14b8a6" });
+      }
+    }
     popups.push({ x: BX+BW/2, y: BY+BH/2, text: cleared>=4 ? `MAJOR GC! +${pts}` : `+${pts}`, life: 60, color: cleared>=4 ? "#a78bfa" : "#fb923c" });
-    pickleLineCounter += cleared;
-    while (pickleLineCounter >= 15) { pickleLineCounter -= 15; pickleActive = true; pickleEnd = frameCount + 180; sndPickle(); popups.push({ x: BX+BW/2, y: BY+40, text: "🥒 PICKLE! Press P!", life: 90, color: "#22c55e" }); }
   }
 }
 function clearMarkedRows() {
   if (!markedRows.size) return;
   for (const r of Array.from(markedRows).sort((a,b) => b-a)) { board.splice(r,1); board.unshift(Array(COLS).fill(0)); }
   markedRows.clear();
-}
-function activatePickle() {
-  if (!pickleActive || gcActive || !running) return;
-  pickleActive = false;
-  const col = Math.floor(Math.random() * COLS);
-  let cleared = 0;
-  for (let r = 0; r < ROWS; r++) if (board[r][col]) {
-    pickleEmojis.push({ x: BX + col * CELL + CELL / 2, y: BY + r * CELL, vy: -(2 + Math.random() * 3), life: 60 });
-    board[r][col] = 0; cleared++;
-  }
-  if (cleared > 0) {
-    pickleColFlash = col; pickleColFlashEnd = frameCount + 20;
-    const pts = cleared * 50 * level; score += pts; sndPickle();
-    popups.push({ x: BX + BW / 2, y: BY + BH / 2, text: `🥒 PICKLE CLEAR! +${pts}`, life: 60, color: "#4ade80" });
-    markedRows.clear();
-    for (let r = ROWS - 1; r >= 0; r--) if (board[r].every(c => c > 0)) markedRows.add(r);
-  }
 }
 function activateDefrag() {
   if (gcActive || !running || defragFlashTimer > 0) return;
@@ -280,7 +261,7 @@ document.addEventListener("keydown", (e) => {
     if (e.code === "KeyD") { e.preventDefault(); activateDefrag(); }
     return;
   }
-  const acts: Record<string,()=>void> = { ArrowLeft: moveL, ArrowRight: moveR, ArrowDown: softDrop, ArrowUp: rotate, Space: hardDrop, KeyD: activateDefrag, KeyP: activatePickle };
+  const acts: Record<string,()=>void> = { ArrowLeft: moveL, ArrowRight: moveR, ArrowDown: softDrop, ArrowUp: rotate, Space: hardDrop, KeyD: activateDefrag };
   if (acts[e.code]) { e.preventDefault(); acts[e.code](); }
 });
 canvas.addEventListener("touchstart", (e) => {
@@ -318,17 +299,17 @@ canvas.addEventListener("click", (e) => {
 
 // Lifecycle
 function startGame() {
+  cancelAnimationFrame(animFrameId);
   startScreen.classList.add("hidden"); gameOverScreen.classList.add("hidden");
   resetBoard(); markedRows.clear(); popups = [];
   score=0; lines=0; level=1; gcPauses=0; totalGcTime=0; frameCount=0; dropTimer=0; gcMeter=0; gcActive=false; gcFreezeEnd=0; catX=-40; catPhase=0;
   defragCharges=0; defragLineCounter=0; defragUsed=0; defragFlashTimer=0; defragFlashRows=[];
-  defragInteractive=false; defragSwapFirst=null; defragInteractiveTimer=0; defragInteractiveRows=[];
-  pickleLineCounter=0; pickleActive=false; pickleEnd=0; pickleColFlash=-1; pickleColFlashEnd=0; pickleEmojis=[]; pickleRaindrops=[];
+  defragInteractive=false; defragSwapFirst=null; defragInteractiveTimer=0; defragInteractiveRows=[]; firstDefragEarned=false;
   nPlusOneActive=false; nPlusOneEnd=0; nPlusOneWarnEnd=0;
   memLeakActive=false; memLeakEnd=0; memLeakCol=-1; memLeakWarnEnd=0; memLeakNextBlock=0; memLeakBlocksPlaced=0;
   cacheMissActive=false; cacheMissWarnEnd=0;
   lastNPlusOne=0; lastMemLeak=0; lastCacheMiss=0;
-  nextType = randomType(); spawnPiece(); running = true; requestAnimationFrame(gameLoop);
+  nextType = randomType(); spawnPiece(); running = true; animFrameId = requestAnimationFrame(gameLoop);
 }
 function endGame() {
   running = false; current = null;
@@ -394,17 +375,6 @@ function update() {
     return;
   }
   updatePerfEvents();
-  // Pickle power-up timer
-  if (pickleActive && frameCount >= pickleEnd) pickleActive = false;
-  // Pickle column flash timer
-  if (pickleColFlash >= 0 && frameCount >= pickleColFlashEnd) pickleColFlash = -1;
-  // Update pickle emojis
-  pickleEmojis = pickleEmojis.map(p => ({...p, y: p.y + p.vy, life: p.life - 1})).filter(p => p.life > 0);
-  // Pickle rain during N+1 storm
-  if (nPlusOneActive && Math.random() < 0.15) {
-    pickleRaindrops.push({ x: BX + Math.random() * BW, y: BY, speed: 1 + Math.random() * 2, size: 8 + Math.random() * 6 });
-  }
-  pickleRaindrops = pickleRaindrops.map(p => ({...p, y: p.y + p.speed})).filter(p => p.y < BY + BH);
   if (defragFlashTimer > 0) {
     defragFlashTimer--;
     if (defragFlashTimer === 0) {
@@ -562,10 +532,6 @@ function draw() {
     ctx.fillStyle=`rgba(245,158,11,${flash})`; ctx.fillRect(BX,BY,BW,BH);
     ctx.fillStyle="#f59e0b"; ctx.font="bold 12px monospace"; ctx.textAlign="center";
     ctx.fillText("⚡ N+1 STORM ⚡", BX+BW/2, BY+16); ctx.textAlign="left";
-    // Pickle rain
-    ctx.font="10px serif";
-    for (const pr of pickleRaindrops) { ctx.globalAlpha = 0.4; ctx.fillText("🥒", pr.x, pr.y); }
-    ctx.globalAlpha = 1;
   }
   if (memLeakWarnEnd > 0 && frameCount < memLeakWarnEnd) {
     const flash = Math.sin(frameCount * 0.3) > 0 ? 1 : 0.3;
@@ -587,25 +553,6 @@ function draw() {
     ctx.fillStyle="#ef4444"; ctx.font="bold 11px monospace"; ctx.textAlign="center";
     ctx.fillText("❌ CACHE MISS", BX+BW/2, BY+16); ctx.textAlign="left";
   }
-  // Pickle column flash
-  if (pickleColFlash >= 0) {
-    const pa = 0.3 + Math.sin(frameCount * 0.5) * 0.2;
-    ctx.fillStyle = `rgba(74,222,128,${pa})`; ctx.fillRect(BX + pickleColFlash * CELL, BY, CELL, BH);
-  }
-  // Pickle power-up icon
-  if (pickleActive) {
-    const bob = Math.sin(frameCount * 0.12) * 4;
-    const pulse = 0.7 + Math.sin(frameCount * 0.15) * 0.3;
-    ctx.globalAlpha = pulse; ctx.font = "24px serif"; ctx.textAlign = "center";
-    ctx.fillText("🥒", BX + BW / 2, BY + 20 + bob);
-    ctx.font = "bold 10px monospace"; ctx.fillStyle = "#4ade80";
-    const secLeft = Math.max(0, Math.ceil((pickleEnd - frameCount) / 60));
-    ctx.fillText(`Press P! ${secLeft}s`, BX + BW / 2, BY + 38 + bob);
-    ctx.globalAlpha = 1; ctx.textAlign = "left";
-  }
-  // Flying pickle emojis
-  for (const pe of pickleEmojis) { ctx.globalAlpha = pe.life / 60; ctx.font = "14px serif"; ctx.fillText("🥒", pe.x - 7, pe.y); }
-  ctx.globalAlpha = 1;
   // Popups
   for (const p of popups) { ctx.globalAlpha=Math.min(1,p.life/60); ctx.font="bold 13px monospace"; ctx.fillStyle=p.color; ctx.textAlign="center"; ctx.fillText(p.text,p.x,p.y-(60-p.life)*0.8); ctx.globalAlpha=1; }
   // HUD
@@ -618,7 +565,7 @@ function gameLoop() {
   if (!running) return;
   frameCount++; update(); draw();
   popups = popups.map(p => ({...p, life: p.life-1})).filter(p => p.life > 0);
-  requestAnimationFrame(gameLoop);
+  animFrameId = requestAnimationFrame(gameLoop);
 }
 $("hud-best").textContent = best+"";
 </script>
