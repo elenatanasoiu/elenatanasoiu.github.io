@@ -20,16 +20,6 @@ import Footer from "../../components/Footer.astro";
         <p id="overall-label" class="text-lg font-semibold"></p>
       </div>
 
-      <div class="text-center">
-        <button
-          id="share-btn"
-          class="inline-flex items-center gap-2 bg-flame-500 hover:bg-flame-600 text-white font-semibold px-6 py-3 rounded-lg transition-colors font-mono text-sm"
-        >
-          📋 Copy Performance Review
-        </button>
-        <p id="share-feedback" class="text-text-muted text-xs mt-2 hidden">Copied to clipboard!</p>
-      </div>
-
       <div class="text-center mt-8">
         <a href="/games" class="text-flame-400 hover:text-flame-300 text-sm font-mono transition-colors">← Back to Games</a>
       </div>
@@ -44,7 +34,6 @@ import Footer from "../../components/Footer.astro";
     { name: "Flamegraph Runner", emoji: "🐈‍⬛", key: "flamegraph-runner-best" },
     { name: "N+1 Swatter",      emoji: "🧹",    key: "n1-swatter-best" },
     { name: "Cache Cat",         emoji: "🐈‍⬛", key: "cache-cat-best" },
-    { name: "Stack Diver",       emoji: "🔥",    key: "stackDiverBest" },
     { name: "Pickle Panic",      emoji: "🥒",    key: "pickle-panic-best" },
   ];
 
@@ -87,36 +76,4 @@ import Footer from "../../components/Footer.astro";
   overallLabel.textContent = overallRating.label === "Staff" ? "Staff Engineer 🔥" : overallRating.label + " Engineer";
   if (overallRating.glow) overallEl.classList.add(...overallRating.glow.split(" "));
   overallEl.classList.remove("hidden");
-
-  const shareBtn = document.getElementById("share-btn")!;
-  const feedback = document.getElementById("share-feedback")!;
-
-  shareBtn.addEventListener("click", async () => {
-    const lines = ["🏆 My Performance Review @ elenatanasoiu.com/games"];
-    games.forEach((game) => {
-      const score = parseInt(localStorage.getItem(game.key) || "0");
-      const rating = getRating(score);
-      lines.push(`${game.emoji} ${game.name}: ${score === 0 ? "—" : score + "pts"} (${rating.label})`);
-    });
-    const overall = getRating(totalScore);
-    lines.push(`Overall: ${overall.label === "Staff" ? "Staff Engineer 🔥" : overall.label + " Engineer"}`);
-
-    try {
-      await navigator.clipboard.writeText(lines.join("\n"));
-      feedback.classList.remove("hidden");
-      setTimeout(() => feedback.classList.add("hidden"), 2000);
-    } catch {
-      // Fallback for older browsers
-      const ta = document.createElement("textarea");
-      ta.value = lines.join("\n");
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      feedback.classList.remove("hidden");
-      setTimeout(() => feedback.classList.add("hidden"), 2000);
-    }
-  });
 </script>

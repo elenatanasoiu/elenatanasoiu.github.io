@@ -3,18 +3,18 @@ import Layout from "../../layouts/Layout.astro";
 import Nav from "../../components/Nav.astro";
 import Footer from "../../components/Footer.astro";
 ---
-<Layout ogImage="/images/og-pickle-panic.png" title="" ogImage="/images/og-pickle-panic.png" description="Tetris meets garbage collection. Stack code objects before the GC cat freezes everything.">
+<Layout ogImage="/images/og-pickle-panic.png" title="" ogImage="/images/og-pickle-panic.png" description="Pack pickles into the jar before it overflows! A Tetris-meets-GC game.">
   <Nav />
   <main class="flex-1 pt-24 pb-8">
     <div class="max-w-4xl mx-auto px-6 text-center">
       <h1 class="text-2xl md:text-3xl font-bold mb-2">🥒 Pickle Panic</h1>
-      <p class="text-text-secondary text-sm mb-4 max-w-md mx-auto">Tetris meets garbage collection. Clear lines — but beware the GC cat.</p>
+      <p class="text-text-secondary text-sm mb-4 max-w-md mx-auto">Pack pickles into the jar before it overflows!</p>
       <div class="relative inline-block">
         <canvas id="game" width="360" height="640" class="rounded-xl border border-surface-600 bg-surface-900 max-w-full"></canvas>
         <div id="start-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-900/90 rounded-xl">
           <div class="text-5xl mb-4">🥒</div>
           <h2 class="text-text-primary font-bold text-xl mb-2">Pickle Panic</h2>
-          <p class="text-text-secondary text-xs mb-1 max-w-[250px]">Your pickled objects are piling up! Clear rows before the GC cat freezes everything.</p>
+          <p class="text-text-secondary text-xs mb-1 max-w-[250px]">Pack the pickles! Clear rows before the jar overflows and the GC cat knocks it over.</p>
           <button id="start-btn" class="bg-flame-500 hover:bg-flame-600 text-surface-900 font-bold py-2 px-8 rounded-xl text-sm transition-colors cursor-pointer">START</button>
           <p class="text-text-muted text-xs mt-4 font-mono">↑ rotate · ←→ move · ↓ soft drop · space hard drop</p>
           <p class="text-text-muted text-xs font-mono">D defrag (swap blocks to complete rows)</p>
@@ -22,12 +22,12 @@ import Footer from "../../components/Footer.astro";
         </div>
         <div id="game-over" class="absolute inset-0 flex flex-col items-center justify-center bg-surface-900/90 rounded-xl hidden">
           <div class="text-4xl mb-3">😿</div>
-          <h2 id="game-over-title" class="text-text-primary font-bold text-xl mb-3">Heap Overflow!</h2>
+          <h2 id="game-over-title" class="text-text-primary font-bold text-xl mb-3">Jar Overflow!</h2>
           <div class="text-left text-sm font-mono space-y-1 mb-4">
             <p><span class="text-text-muted">Score: </span><span id="final-score" class="text-flame-400">0</span></p>
             <p><span class="text-text-muted">Lines: </span><span id="final-lines" class="text-teal-400">0</span></p>
-            <p><span class="text-text-muted">GC Pauses: </span><span id="final-pauses" class="text-purple-400">0</span></p>
-            <p><span class="text-text-muted">GC Time: </span><span id="final-gc-time" class="text-purple-400">0s</span></p>
+            <p><span class="text-text-muted">Spills: </span><span id="final-pauses" class="text-purple-400">0</span></p>
+            <p><span class="text-text-muted">Spill Time: </span><span id="final-gc-time" class="text-purple-400">0s</span></p>
             <p><span class="text-text-muted">Defrags: </span><span id="final-defrags" class="text-teal-400">0</span></p>
             <p><span class="text-text-muted">Best: </span><span id="final-best" class="text-flame-400">0</span></p>
           </div>
@@ -58,10 +58,13 @@ const W = canvas.width, H = canvas.height;
 const COLS = 10, ROWS = 20, CELL = 24;
 const BX = 12, BY = 28, BW = COLS * CELL, BH = ROWS * CELL;
 const C = {
-  bg: "#050508", grid: "#13131f", border: "#1e1e2e",
-  pieces: ["#4ade80","#fb923c","#22c55e","#16a34a","#14b8a6","#7c3aed","#a78bfa"],
-  ghost: "rgba(249,115,22,0.15)", marked: "rgba(124,58,237,0.5)",
+  bg: "#050508", grid: "#0d1a0d", border: "#1e2e1e",
+  pieces: ["#4ade80","#86efac","#22c55e","#16a34a","#a3e635","#65a30d","#84cc16"],
+  seeds: ["#d4edda","#f0fff0","#e8f5e9","#c8e6c9","#f5f5dc","#e6eed6","#ecf4e0"],
+  ghost: "rgba(74,222,128,0.15)", marked: "rgba(124,58,237,0.5)",
   gcOverlay: "rgba(124,58,237,0.25)", gcText: "#a78bfa",
+  brine: "rgba(190,180,50,0.08)", brineWave: "rgba(200,190,60,0.15)",
+  jarGlass: "rgba(200,220,200,0.06)", jarRim: "#3a5a3a",
 };
 const SHAPES: number[][][] = [
   [[1,1],[1,1]], [[0,1,0],[1,1,1]], [[1,1,0],[0,1,1]], [[0,1,1],[1,1,0]],
@@ -234,11 +237,11 @@ function ghostY(): number {
 function triggerGC(minor = false) {
   gcActive = true; catX = -40; catPhase = 0; sndGcStart();
   if (minor) { gcFreezeEnd = frameCount+30; gcPauses++; totalGcTime += 0.5; gcMeter = 0;
-    popups.push({ x: BX+BW/2, y: BY+60, text: "minor GC", life: 30, color: "#7c3aed" }); return; }
+    popups.push({ x: BX+BW/2, y: BY+60, text: "minor spill 🥒", life: 30, color: "#7c3aed" }); return; }
   const pauseMs = (800 + markedRows.size * 400) * (1 + (level-1) * 0.15);
   gcFreezeEnd = frameCount + Math.ceil(pauseMs / 16.67);
   gcPauses++; totalGcTime += pauseMs/1000;
-  popups.push({ x: BX+BW/2, y: BY+60, text: "GC PAUSE!", life: Math.ceil(pauseMs/16.67), color: C.gcText });
+  popups.push({ x: BX+BW/2, y: BY+60, text: "🥒 JAR OVERFLOW!", life: Math.ceil(pauseMs/16.67), color: C.gcText });
 }
 
 // Input
@@ -329,7 +332,7 @@ function updatePerfEvents() {
   // N+1 Query Storm
   if (nPlusOneWarnEnd > 0 && frameCount >= nPlusOneWarnEnd && canSchedule) {
     nPlusOneWarnEnd = 0; nPlusOneActive = true; nPlusOneEnd = frameCount + 300; sndNPlusOne();
-    popups.push({ x: BX+BW/2, y: BY+40, text: "⚡ N+1 STORM!", life: 90, color: "#f59e0b" });
+    popups.push({ x: BX+BW/2, y: BY+40, text: "🥒 PICKLE STORM!", life: 90, color: "#f59e0b" });
   }
   if (nPlusOneActive && frameCount >= nPlusOneEnd) { nPlusOneActive = false; }
   if (canSchedule && !nPlusOneActive && nPlusOneWarnEnd === 0 && frameCount - lastNPlusOne >= 2700) {
@@ -340,7 +343,7 @@ function updatePerfEvents() {
     memLeakWarnEnd = 0; memLeakActive = true; memLeakEnd = frameCount + 480;
     memLeakCol = Math.floor(Math.random() * COLS); memLeakBlocksPlaced = 0;
     memLeakNextBlock = frameCount + 120; sndMemLeak();
-    popups.push({ x: BX+BW/2, y: BY+40, text: "💧 MEMORY LEAK!", life: 90, color: "#6b7280" });
+    popups.push({ x: BX+BW/2, y: BY+40, text: "💧 BRINE LEAK!", life: 90, color: "#6b7280" });
   }
   if (memLeakActive && !defragInteractive) {
     if (frameCount >= memLeakNextBlock && memLeakBlocksPlaced < 4) {
@@ -358,7 +361,7 @@ function updatePerfEvents() {
   // Cache Miss
   if (cacheMissWarnEnd > 0 && frameCount >= cacheMissWarnEnd && canSchedule) {
     cacheMissWarnEnd = 0; cacheMissActive = true; sndCacheMiss();
-    popups.push({ x: BX+BW/2, y: BY+40, text: "❌ CACHE MISS!", life: 60, color: "#ef4444" });
+    popups.push({ x: BX+BW/2, y: BY+40, text: "🥒❌ PICKLE MISS!", life: 60, color: "#ef4444" });
   }
   if (canSchedule && !cacheMissActive && cacheMissWarnEnd === 0 && frameCount - lastCacheMiss >= 1800) {
     cacheMissWarnEnd = frameCount + 60; lastCacheMiss = frameCount;
@@ -400,9 +403,98 @@ function update() {
 // Draw helpers
 function drawCell(x: number, y: number, ci: number, a = 1) {
   const px=BX+x*CELL, py=BY+y*CELL; ctx.globalAlpha=a;
-  ctx.fillStyle = C.pieces[(ci-1)%C.pieces.length];
-  ctx.beginPath(); ctx.roundRect(px+1,py+1,CELL-2,CELL-2,3); ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fillRect(px+2,py+2,CELL-4,2); ctx.globalAlpha=1;
+  const baseColor = C.pieces[(ci-1)%C.pieces.length];
+  const seedColor = C.seeds[(ci-1)%C.seeds.length];
+  // Pickle skin (darker border)
+  ctx.fillStyle = darkenColor(baseColor, 0.3);
+  ctx.beginPath(); ctx.roundRect(px+1,py+1,CELL-2,CELL-2,4); ctx.fill();
+  // Pickle flesh
+  ctx.fillStyle = baseColor;
+  ctx.beginPath(); ctx.roundRect(px+2,py+2,CELL-4,CELL-4,3); ctx.fill();
+  // Highlight (wet pickle shine)
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillRect(px+3,py+3,CELL-6,2);
+  // Seeds (2 small dots)
+  ctx.fillStyle = seedColor;
+  const s1x = px+7, s1y = py+10, s2x = px+15, s2y = py+14;
+  ctx.beginPath(); ctx.ellipse(s1x,s1y,2,1.5,0.3,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(s2x,s2y,2,1.5,-0.3,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha=1;
+}
+function darkenColor(hex: string, amt: number): string {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgb(${Math.floor(r*(1-amt))},${Math.floor(g*(1-amt))},${Math.floor(b*(1-amt))})`;
+}
+function drawJar() {
+  const curve = 6;
+  // Jar body (glass)
+  ctx.fillStyle = "#080c08";
+  ctx.beginPath();
+  ctx.moveTo(BX+curve, BY);
+  ctx.lineTo(BX+BW-curve, BY);
+  ctx.quadraticCurveTo(BX+BW, BY, BX+BW, BY+curve);
+  ctx.lineTo(BX+BW, BY+BH-curve);
+  ctx.quadraticCurveTo(BX+BW, BY+BH, BX+BW-curve, BY+BH);
+  ctx.lineTo(BX+curve, BY+BH);
+  ctx.quadraticCurveTo(BX, BY+BH, BX, BY+BH-curve);
+  ctx.lineTo(BX, BY+curve);
+  ctx.quadraticCurveTo(BX, BY, BX+curve, BY);
+  ctx.fill();
+  // Grid lines
+  ctx.strokeStyle=C.grid; ctx.lineWidth=0.5;
+  for (let i=1;i<COLS;i++) { ctx.beginPath(); ctx.moveTo(BX+i*CELL,BY); ctx.lineTo(BX+i*CELL,BY+BH); ctx.stroke(); }
+  for (let i=1;i<ROWS;i++) { ctx.beginPath(); ctx.moveTo(BX,BY+i*CELL); ctx.lineTo(BX+BW,BY+i*CELL); ctx.stroke(); }
+  // Glass reflection (diagonal highlight)
+  ctx.save(); ctx.globalAlpha=0.04;
+  ctx.fillStyle="#ffffff";
+  ctx.beginPath();
+  ctx.moveTo(BX+4, BY); ctx.lineTo(BX+18, BY); ctx.lineTo(BX+4, BY+BH*0.7); ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  // Jar rim / lip (wider strip at top)
+  ctx.fillStyle = C.jarRim;
+  ctx.beginPath(); ctx.roundRect(BX-3, BY-6, BW+6, 8, 3); ctx.fill();
+  ctx.fillStyle = "#4a7a4a";
+  ctx.beginPath(); ctx.roundRect(BX-2, BY-5, BW+4, 4, 2); ctx.fill();
+  // Jar outline
+  ctx.strokeStyle=C.border; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(BX+curve, BY);
+  ctx.lineTo(BX+BW-curve, BY);
+  ctx.quadraticCurveTo(BX+BW, BY, BX+BW, BY+curve);
+  ctx.lineTo(BX+BW, BY+BH-curve);
+  ctx.quadraticCurveTo(BX+BW, BY+BH, BX+BW-curve, BY+BH);
+  ctx.lineTo(BX+curve, BY+BH);
+  ctx.quadraticCurveTo(BX, BY+BH, BX, BY+BH-curve);
+  ctx.lineTo(BX, BY+curve);
+  ctx.quadraticCurveTo(BX, BY, BX+curve, BY);
+  ctx.stroke();
+}
+function drawBrine() {
+  // Find highest occupied row
+  let topRow = ROWS;
+  for (let r = 0; r < ROWS; r++) { if (board[r].some(c => c !== 0)) { topRow = r; break; } }
+  if (topRow >= ROWS) return;
+  const brineTop = BY + topRow * CELL;
+  const brineH = BY + BH - brineTop;
+  // Brine fill
+  ctx.fillStyle = C.brine;
+  ctx.fillRect(BX+1, brineTop, BW-2, brineH);
+  // Wavy top edge
+  ctx.strokeStyle = C.brineWave; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let x = 0; x <= BW; x += 2) {
+    const waveY = brineTop + Math.sin((x + frameCount * 1.5) * 0.08) * 2;
+    x === 0 ? ctx.moveTo(BX + x, waveY) : ctx.lineTo(BX + x, waveY);
+  }
+  ctx.stroke();
+  // Bubbles
+  if (frameCount % 30 === 0 && topRow < ROWS - 2) {
+    const bx = BX + 10 + Math.random() * (BW - 20);
+    const by = BY + (topRow + 2 + Math.random() * (ROWS - topRow - 3)) * CELL;
+    ctx.fillStyle = "rgba(200,220,100,0.15)";
+    ctx.beginPath(); ctx.arc(bx, by, 2 + Math.random() * 3, 0, Math.PI * 2); ctx.fill();
+  }
 }
 function drawMeter(x: number, y: number, h: number, pct: number, label: string, colors: string[]) {
   ctx.fillStyle="#a0a0b0"; ctx.font="bold 10px monospace"; ctx.textAlign="left"; ctx.fillText(label, x, y-2);
@@ -416,18 +508,15 @@ function drawMeter(x: number, y: number, h: number, pct: number, label: string, 
 
 function draw() {
   ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle="#0a0a12"; ctx.fillRect(BX,BY,BW,BH);
-  // Grid
-  ctx.strokeStyle=C.grid; ctx.lineWidth=0.5;
-  for (let i=0;i<=COLS;i++) { ctx.beginPath(); ctx.moveTo(BX+i*CELL,BY); ctx.lineTo(BX+i*CELL,BY+BH); ctx.stroke(); }
-  for (let i=0;i<=ROWS;i++) { ctx.beginPath(); ctx.moveTo(BX,BY+i*CELL); ctx.lineTo(BX+BW,BY+i*CELL); ctx.stroke(); }
-  ctx.strokeStyle=C.border; ctx.lineWidth=2; ctx.strokeRect(BX,BY,BW,BH);
+  drawJar();
+  drawBrine();
   // Placed blocks
   for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) if (board[r][c]) {
     if (board[r][c] === LEAKED_BLOCK) {
       const px=BX+c*CELL, py=BY+r*CELL;
-      ctx.fillStyle="#4b5563"; ctx.beginPath(); ctx.roundRect(px+1,py+1,CELL-2,CELL-2,3); ctx.fill();
-      ctx.fillStyle="rgba(156,163,175,0.2)"; ctx.fillRect(px+2,py+2,CELL-4,2);
+      ctx.fillStyle="#3d4a2a"; ctx.beginPath(); ctx.roundRect(px+1,py+1,CELL-2,CELL-2,4); ctx.fill();
+      ctx.fillStyle="#4a5a30"; ctx.beginPath(); ctx.roundRect(px+2,py+2,CELL-4,CELL-4,3); ctx.fill();
+      ctx.fillStyle="rgba(100,80,40,0.3)"; ctx.fillRect(px+3,py+3,CELL-6,2);
     } else {
       const mk = markedRows.has(r);
       drawCell(c,r,board[r][c], mk ? 0.5+Math.sin(frameCount*0.1)*0.2 : 1);
@@ -465,7 +554,7 @@ function draw() {
   const px = BX+BW+14;
   // Next preview
   ctx.fillStyle="#a0a0b0"; ctx.font="bold 10px monospace"; ctx.textAlign="left"; ctx.fillText("NEXT",px,BY+12);
-  ctx.fillStyle="#0a0a12"; ctx.beginPath(); ctx.roundRect(px,BY+18,72,56,6); ctx.fill(); ctx.strokeStyle=C.border; ctx.lineWidth=1; ctx.stroke();
+  ctx.fillStyle="#080c08"; ctx.beginPath(); ctx.roundRect(px,BY+18,72,56,6); ctx.fill(); ctx.strokeStyle=C.border; ctx.lineWidth=1; ctx.stroke();
   if (cacheMissActive) {
     ctx.fillStyle="#ef4444"; ctx.font="bold 16px monospace"; ctx.textAlign="center";
     ctx.fillText("???", px+36, BY+50); ctx.textAlign="left";
@@ -478,16 +567,16 @@ function draw() {
   // GC + Heap meters
   const mY=BY+108, mH=120;
   const gcFill = Math.min(1, gcMeter/GC_THRESHOLD);
-  drawMeter(px, BY+96, mH, gcFill, "GC PRESSURE", ["#7c3aed","#f97316","#ef4444"]);
+  drawMeter(px, BY+96, mH, gcFill, "BRINE LVL", ["#7c3aed","#f97316","#ef4444"]);
   const heapPct = board.flat().filter(c=>c!==0).length / (COLS*ROWS);
-  drawMeter(px+28, BY+96, mH, heapPct, "HEAP", ["#14b8a6","#f97316","#ef4444"]);
+  drawMeter(px+28, BY+96, mH, heapPct, "JAR FILL", ["#22c55e","#f97316","#ef4444"]);
   // Cat emoji
   ctx.font="16px serif"; ctx.textAlign="center";
   const bob = Math.sin(frameCount*0.08)*2;
-  ctx.fillText(gcFill>0.8?"😾":gcFill>0.5?"🐱":"😺", px+10, mY+mH+20+bob);
+  ctx.fillText(gcFill>0.8?"😾🥒":gcFill>0.5?"🐱🥒":"😺", px+10, mY+mH+20+bob);
   // Stats
   ctx.textAlign="left"; ctx.font="bold 10px monospace"; const sY=mY+mH+42;
-  const stats: [string,string,string][] = [["LEVEL","#f0f0f5",level+""],["SCORE","#fb923c",score+""],["LINES","#14b8a6",lines+""],["GC PAUSES","#a78bfa",gcPauses+""]];
+  const stats: [string,string,string][] = [["LEVEL","#f0f0f5",level+""],["SCORE","#fb923c",score+""],["LINES","#22c55e",lines+""],["SPILLS","#a78bfa",gcPauses+""]];
   stats.forEach(([lbl,clr,val],i) => { ctx.fillStyle="#a0a0b0"; ctx.fillText(lbl,px,sY+i*34); ctx.fillStyle=clr; ctx.fillText(val,px,sY+i*34+14); });
   // Defrag indicator
   const dY = sY + stats.length * 34 + 4;
@@ -507,16 +596,16 @@ function draw() {
     ctx.fillStyle=C.gcOverlay; ctx.fillRect(BX,BY,BW,BH);
     const ia = 0.3+Math.sin(frameCount*0.15)*0.15;
     ctx.strokeStyle=`rgba(167,139,250,${ia})`; ctx.lineWidth=3; ctx.strokeRect(BX+2,BY+2,BW-4,BH-4);
-    // Sweeping cat with Z's
+    // Sweeping cat knocking the jar
     ctx.font="20px serif"; ctx.textAlign="center";
     const sb=Math.sin(catPhase)*4, cx=BX+Math.min(catX,BW+10);
-    ctx.fillText("😹",cx,BY+BH-20+sb);
-    for (let i=0;i<3;i++) { const za=(catPhase+i*1.2)%3; ctx.globalAlpha=Math.max(0,1-za/3); ctx.font=`${10+i*2}px monospace`; ctx.fillStyle=C.gcText; ctx.fillText("z",cx+14+i*6,BY+BH-30-za*20+sb); }
+    ctx.fillText("😹🥒",cx,BY+BH-20+sb);
+    for (let i=0;i<3;i++) { const za=(catPhase+i*1.2)%3; ctx.globalAlpha=Math.max(0,1-za/3); ctx.font=`${10+i*2}px monospace`; ctx.fillStyle=C.gcText; ctx.fillText("z",cx+20+i*6,BY+BH-30-za*20+sb); }
     ctx.globalAlpha=1;
     // Pause counter
     const rem = Math.max(0,(gcFreezeEnd-frameCount)*16.67);
     ctx.fillStyle=C.gcText; ctx.textAlign="center"; ctx.shadowBlur=10; ctx.shadowColor="#7c3aed";
-    ctx.font="bold 16px monospace"; ctx.fillText("⏸ GC PAUSE",BX+BW/2,BY+BH/2-10);
+    ctx.font="bold 16px monospace"; ctx.fillText("🥒 JAR OVERFLOW!",BX+BW/2,BY+BH/2-10);
     ctx.font="bold 22px monospace"; ctx.fillText(`${Math.ceil(rem)}ms`,BX+BW/2,BY+BH/2+18);
     ctx.shadowBlur=0;
     for (const r of markedRows) { ctx.fillStyle=`rgba(167,139,250,${0.15+Math.sin(frameCount*0.2)*0.1})`; ctx.fillRect(BX,BY+r*CELL,BW,CELL); }
@@ -525,33 +614,33 @@ function draw() {
   if (nPlusOneWarnEnd > 0 && frameCount < nPlusOneWarnEnd) {
     const flash = Math.sin(frameCount * 0.3) > 0 ? 1 : 0.3;
     ctx.globalAlpha = flash; ctx.fillStyle="#f59e0b"; ctx.font="bold 13px monospace"; ctx.textAlign="center";
-    ctx.fillText("⚠ N+1 STORM INCOMING", BX+BW/2, BY+16); ctx.globalAlpha=1; ctx.textAlign="left";
+    ctx.fillText("⚠ PICKLE STORM INCOMING", BX+BW/2, BY+16); ctx.globalAlpha=1; ctx.textAlign="left";
   }
   if (nPlusOneActive) {
     const flash = 0.08 + Math.sin(frameCount * 0.2) * 0.04;
     ctx.fillStyle=`rgba(245,158,11,${flash})`; ctx.fillRect(BX,BY,BW,BH);
     ctx.fillStyle="#f59e0b"; ctx.font="bold 12px monospace"; ctx.textAlign="center";
-    ctx.fillText("⚡ N+1 STORM ⚡", BX+BW/2, BY+16); ctx.textAlign="left";
+    ctx.fillText("🥒 PICKLE STORM 🥒", BX+BW/2, BY+16); ctx.textAlign="left";
   }
   if (memLeakWarnEnd > 0 && frameCount < memLeakWarnEnd) {
     const flash = Math.sin(frameCount * 0.3) > 0 ? 1 : 0.3;
     ctx.globalAlpha = flash; ctx.fillStyle="#6b7280"; ctx.font="bold 13px monospace"; ctx.textAlign="center";
-    ctx.fillText("⚠ MEMORY LEAK DETECTED", BX+BW/2, BY+16); ctx.globalAlpha=1; ctx.textAlign="left";
+    ctx.fillText("⚠ BRINE LEAK DETECTED", BX+BW/2, BY+16); ctx.globalAlpha=1; ctx.textAlign="left";
   }
   if (memLeakActive) {
     ctx.fillStyle="#6b7280"; ctx.font="bold 11px monospace"; ctx.textAlign="center";
-    ctx.fillText("💧 MEMORY LEAK", BX+BW/2, BY+16); ctx.textAlign="left";
+    ctx.fillText("💧 BRINE LEAK", BX+BW/2, BY+16); ctx.textAlign="left";
     const colFlash = 0.05 + Math.sin(frameCount * 0.1) * 0.03;
     ctx.fillStyle=`rgba(107,114,128,${colFlash})`; ctx.fillRect(BX+memLeakCol*CELL, BY, CELL, BH);
   }
   if (cacheMissWarnEnd > 0 && frameCount < cacheMissWarnEnd) {
     const flash = Math.sin(frameCount * 0.3) > 0 ? 1 : 0.3;
     ctx.globalAlpha = flash; ctx.fillStyle="#ef4444"; ctx.font="bold 13px monospace"; ctx.textAlign="center";
-    ctx.fillText("⚠ CACHE MISS INCOMING", BX+BW/2, BY+16); ctx.globalAlpha=1; ctx.textAlign="left";
+    ctx.fillText("⚠ PICKLE MISS INCOMING", BX+BW/2, BY+16); ctx.globalAlpha=1; ctx.textAlign="left";
   }
   if (cacheMissActive) {
     ctx.fillStyle="#ef4444"; ctx.font="bold 11px monospace"; ctx.textAlign="center";
-    ctx.fillText("❌ CACHE MISS", BX+BW/2, BY+16); ctx.textAlign="left";
+    ctx.fillText("🥒❌ PICKLE MISS", BX+BW/2, BY+16); ctx.textAlign="left";
   }
   // Popups
   for (const p of popups) { ctx.globalAlpha=Math.min(1,p.life/60); ctx.font="bold 13px monospace"; ctx.fillStyle=p.color; ctx.textAlign="center"; ctx.fillText(p.text,p.x,p.y-(60-p.life)*0.8); ctx.globalAlpha=1; }
